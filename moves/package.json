@@ -1,0 +1,18 @@
+{
+  "name": "moves-import",
+  "version": "1.0.0",
+  "description": "Import data from Moves app into Correl8.me",
+  "main": "app.js",
+  "dependencies": {
+    "elasticsearch": "^8.2.0",
+    "moves": "0.0.2",
+    "moves-date": "^0.1.2"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "start": "node --harmony app.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Samuel Rinnetmäki",
+  "license": "ISC"
+}
