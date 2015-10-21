@@ -152,7 +152,7 @@ function importData(next) {
       firstDate = 1;
     }
     var url = apiUrl + '?starttime=' + Math.floor(firstDate/1000)
-    console.log(url);
+    // console.log(url);
     request(url, function(error, response, body) {
       if (error || !response || !body) {
         // console.warn('Error getting data: ' + JSON.stringify(response.body));
