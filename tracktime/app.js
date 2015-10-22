@@ -164,6 +164,7 @@ function importData(next) {
           bulk.push({index: {_index: INDEX_NAME + '-time', _type: 'time', _id: data[i].id}});
           data[i].starttime = new Date(data[i].starttime);
           data[i].endtime = new Date(data[i].endtime);
+          data[i].duration = data[i].endtime - data[i].starttime;
           data[i].timestamp = data[i].starttime;
           data[i].location = locs[data[i].location];
           data[i].mainaction = acts[data[i].mainaction];
