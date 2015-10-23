@@ -188,8 +188,8 @@ function importData(next) {
         // console.log(bulk);
         client.bulk(
           {
-            index: INDEX_NAME + '-moves',
-            type: 'moves',
+            index: INDEX_NAME + '-time',
+            type: 'time',
             body: bulk
           },
           function (error, response) {
