@@ -48,7 +48,7 @@ function getConfig(next) {
       console.warn("Config search got error: " + JSON.stringify(error));
       return;
     }
-    if (response && response.hits && response.hits[0]) {
+    if (response && response.hits && response.hits.hits[0]) {
       apiUrl = response.hits.hits[0].fields.url;
       next();
     }
