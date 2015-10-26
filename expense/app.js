@@ -76,11 +76,12 @@ function importData(next) {
     }
     if (response && response.hits && response.hits.hits && response.hits.hits[0] && response.hits.hits[0].fields && response.hits.hits[0].fields.timestamp) {
       console.log("Setting first time to " + response.hits.hits[0].fields.timestamp);
-      firstDate = new Date(response.hits.hits[0].fields.timestamp).toISOString();
+      var d = new Date(response.hits.hits[0].fields.timestamp);
+      firstDate = d.getDay() + '.' + (d.getMonth() + 1) + '.' + d.getFullYear();
     }
     else {
       console.warn("No previously indexed data, setting first time to 1!");
-      firstDate = '2000-01-01';
+      firstDate = '1.1.2000';
     }
     var url = apiUrl + '&from=' + firstDate;
     var cookieJar = request.jar();
@@ -96,7 +97,7 @@ function importData(next) {
         for (var i=0; i<data.length; i++) {
           var dayData = data[i];
           for (var j=0; j<dayData.length; j++) {
-            var id = dayData[j].date + '-' + dayData[j].cat;
+            var id = dayData[j].date + '-' + dayData[j].t;
             bulk.push({index: {_index: INDEX_NAME + '-expense', _type: 'expense', _id: id}});
             dayData[j].id = id;
             dayData[j].timestamp = dayData[j].date;
