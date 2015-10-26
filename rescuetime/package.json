@@ -1,0 +1,17 @@
+{
+  "name": "rescuetime-import",
+  "version": "1.0.0",
+  "description": "Import data from RescueTime into Correl8.me",
+  "main": "app.js",
+  "dependencies": {
+    "elasticsearch": "^8.2.0",
+    "request": "^2.65.0"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "start": "node --harmony app.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Samuel Rinnetmäki",
+  "license": "ISC"
+}
