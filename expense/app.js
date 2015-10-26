@@ -28,7 +28,7 @@ if (process.argv[2]) {
 else {
   client.indices.exists({index: 'config'}, function(error, response) {
     if (!response) {
-        console.log('Congigure by ' + process.argv[0] + ' ' + process.argv[1] + ' <trackexpense_url>')
+        console.log('Configure by ' + process.argv[0] + ' ' + process.argv[1] + ' <expense_url>')
     }
     else {
       getConfig(importData);
@@ -48,8 +48,13 @@ function getConfig(next) {
       console.warn("Config search got error: " + JSON.stringify(error));
       return;
     }
-    apiUrl = response.hits.hits[0].fields.url;
-    next();
+    if (response && response.hits && response.hits[0]) {
+      apiUrl = response.hits.hits[0].fields.url;
+      next();
+    }
+    else {
+      console.log('Configure by ' + process.argv[0] + ' ' + process.argv[1] + ' <expense_url>');
+    }
   });
 }
 

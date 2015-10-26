@@ -82,6 +82,31 @@ var locs = {
   '31': 'Public transport'
 };
 
+var parents = [];
+for (var i=1; i<acts.length; i++) {
+  if (i <= 3) {
+    parents[i] = 'Personal care';
+  }
+  else if (i <= 5) {
+    parents[i] = 'Employment';
+  }
+  else if (i <= 8) {
+    parents[i] = 'Study';
+  }
+  else if (i <= 24) {
+    parents[i] = 'Domestic';
+  }
+  else if (i <= 41) {
+    parents[i] = 'Leisure';
+  }
+  else if (i <= 48) {
+    parents[i] = 'Travel';
+  }
+  else {
+    parents[i] = 'Unspecified';
+  }
+}
+
 var withValues = ['', 'alone', 'partner', 'parent', 'kids', 'family', 'others'];
 var configIndex = {index: 'config', type: 'config-adapter'};
 
@@ -102,7 +127,7 @@ if (process.argv[2]) {
 else {
   client.indices.exists({index: 'config'}, function(error, response) {
     if (!response) {
-        console.log('Congigure by ' + process.argv[0] + ' ' + process.argv[1] + ' <tracktime_url>')
+        console.log('Configure by ' + process.argv[0] + ' ' + process.argv[1] + ' <tracktime_url>');
     }
     else {
       getConfig(importData);
@@ -122,8 +147,13 @@ function getConfig(next) {
       console.warn("Config search got error: " + JSON.stringify(error));
       return;
     }
-    apiUrl = response.hits.hits[0].fields.url;
-    next();
+    if (response && response.hits && response.hits.hits) {
+      apiUrl = response.hits.hits[0].fields.url;
+      next();
+    }
+    else {
+      console.log('Configure by ' + process.argv[0] + ' ' + process.argv[1] + ' <tracktime_url>');
+    }
   });
 }
 
@@ -167,7 +197,9 @@ function importData(next) {
           data[i].duration = data[i].endtime - data[i].starttime;
           data[i].timestamp = data[i].starttime;
           data[i].location = locs[data[i].location];
+          data[i].mainparent = parents[data[i].mainaction];
           data[i].mainaction = acts[data[i].mainaction];
+          data[i].sideparent = parents[data[i].sideaction];
           data[i].sideaction = acts[data[i].sideaction];
           if (data[i]['with'] == 1) {
             data[i]['with'] = 'alone';
