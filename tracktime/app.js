@@ -14,12 +14,12 @@ var nopt = require('nopt'),
     'e': ['--end']
   },
   description = {
-    'url': ' Store the URI location of your Tracktime instance and exit',
-    'help': ' This usage text',
+    'url': ' Store the URI of your Tracktime instance and exit',
+    'help': ' Display this usage text and exit',
     'start': ' Start date as YYYY-MM-DD',
     'end': ' End date as YYYY-MM-DD'
   },
-  options = nopt(knownOpts, shortHands, process.argv, 0);
+  options = nopt(knownOpts, shortHands, process.argv, 2);
 
 // console.log(options);
 if (options['help']) {
