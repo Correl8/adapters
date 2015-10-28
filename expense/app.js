@@ -1,4 +1,33 @@
 var request = require("request");
+var nopt = require('nopt'),
+ noptUsage = require("nopt-usage"),
+ knownOpts = {
+    'url': [String, null],
+    'help': Boolean,
+    'start': Date,
+    'end': Date
+  },
+  shortHands = {
+    'h': ['--help'],
+    'u': ['--url'],
+    's': ['--start'],
+    'e': ['--end']
+  },
+  description = {
+    'url': ' Store the URI of your Expense instance and exit',
+    'help': ' Display this usage text and exit',
+    'start': ' Start date as YYYY-MM-DD',
+    'end': ' End date as YYYY-MM-DD'
+  },
+  options = nopt(knownOpts, shortHands, process.argv, 2);
+
+// console.log(options);
+if (options['help']) {
+  console.log('Usage: ');
+  console.log(noptUsage(knownOpts, shortHands, description));
+  process.exit();
+}
+
 var elasticsearch = require('elasticsearch');
 var client = new elasticsearch.Client({
   host: 'localhost:9200',
@@ -7,14 +36,15 @@ var client = new elasticsearch.Client({
 
 var INDEX_NAME = 'correl8';
 
-var firstDate;
+var firstDate = options['start'] || null;
+var lastDate = options['end'] || null;
 var apiUrl;
 var configIndex = {index: 'config', type: 'config-adapter'};
 
-if (process.argv[2]) {
+if (options['url']) {
   var params = configIndex;
   params.id = 'config-adapter-expense';
-  params.body = {id: params.id, url: process.argv[2]};
+  params.body = {id: params.id, url: options['url']};
   client.index(params, function (error, response) {
     if (error) {
       console.warn(error);
@@ -28,7 +58,9 @@ if (process.argv[2]) {
 else {
   client.indices.exists({index: 'config'}, function(error, response) {
     if (!response) {
-        console.log('Configure by ' + process.argv[0] + ' ' + process.argv[1] + ' <expense_url>')
+        console.log('Usage: ');
+        console.log(noptUsage(knownOpts, shortHands, description));
+        // console.log('Configure by ' + process.argv[0] + ' ' + process.argv[1] + ' <expense_url>');
     }
     else {
       getConfig(importData);
@@ -53,7 +85,9 @@ function getConfig(next) {
       next();
     }
     else {
-      console.log('Configure by ' + process.argv[0] + ' ' + process.argv[1] + ' <expense_url>');
+      console.log('Usage: ');
+      console.log(noptUsage(knownOpts, shortHands, description));
+      // console.log('Configure by ' + process.argv[0] + ' ' + process.argv[1] + ' <expense_url>');
     }
   });
 }
@@ -74,16 +108,21 @@ function importData(next) {
       console.warn("search got error: " + JSON.stringify(error));
       return;
     }
-    if (response && response.hits && response.hits.hits && response.hits.hits[0] && response.hits.hits[0].fields && response.hits.hits[0].fields.timestamp) {
+    if (firstDate) {
+      console.log("Setting first time to " + firstDate);
+    }
+    else if (response && response.hits && response.hits.hits && response.hits.hits[0] && response.hits.hits[0].fields && response.hits.hits[0].fields.timestamp) {
       console.log("Setting first time to " + response.hits.hits[0].fields.timestamp);
-      var d = new Date(response.hits.hits[0].fields.timestamp);
-      firstDate = d.getDay() + '.' + (d.getMonth() + 1) + '.' + d.getFullYear();
+      firstDate = new Date(response.hits.hits[0].fields.timestamp);
     }
     else {
       console.warn("No previously indexed data, setting first time to 1!");
-      firstDate = '1.1.2000';
+      firstDate = new Date(0);
     }
-    var url = apiUrl + '&from=' + firstDate;
+    var url = apiUrl + '&from=' + firstDate.getDay() + '.' + (firstDate.getMonth() + 1) + '.' + firstDate.getFullYear();
+    if (lastDate) {
+      url += '&to=' + lastDate.getDay() + '.' + (lastDate.getMonth() + 1) + '.' + lastDate.getFullYear();
+    }
     var cookieJar = request.jar();
     console.log(url);
     request({url: url, jar: cookieJar}, function(error, response, body) {

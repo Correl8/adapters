@@ -1,4 +1,33 @@
 var request = require("request");
+var nopt = require('nopt'),
+ noptUsage = require("nopt-usage"),
+ knownOpts = {
+    'key': [String, null],
+    'help': Boolean,
+    'start': Date,
+    'end': Date
+  },
+  shortHands = {
+    'h': ['--help'],
+    'k': ['--key'],
+    's': ['--start'],
+    'e': ['--end']
+  },
+  description = {
+    'key': ' Store your RescueTime API key and exit',
+    'help': ' Display this usage text and exit',
+    'start': ' Start date as YYYY-MM-DD',
+    'end': ' End date as YYYY-MM-DD'
+  },
+  options = nopt(knownOpts, shortHands, process.argv, 2);
+
+// console.log(options);
+if (options['help']) {
+  console.log('Usage: ');
+  console.log(noptUsage(knownOpts, shortHands, description));
+  process.exit();
+}
+
 var elasticsearch = require('elasticsearch');
 var client = new elasticsearch.Client({
   host: 'localhost:9200',
@@ -7,16 +36,17 @@ var client = new elasticsearch.Client({
 
 var INDEX_NAME = 'correl8';
 
-var firstDate;
+var firstDate = options['start'] || null;
+var lastDate = options['end'] || new Date();
 var apiKey;
 
 // var withValues = ['', 'alone', 'partner', 'parent', 'kids', 'family', 'others'];
 var configIndex = {index: 'config', type: 'config-adapter'};
 
-if (process.argv[2]) {
+if (options['key']) {
   var params = configIndex;
   params.id = 'config-adapter-rescuetime';
-  params.body = {id: params.id, apiKey: process.argv[2]};
+  params.body = {id: params.id, apiKey: options['key']};
   client.index(params, function (error, response) {
     if (error) {
       console.warn(error);
@@ -30,7 +60,9 @@ if (process.argv[2]) {
 else {
   client.indices.exists({index: 'config'}, function(error, response) {
     if (!response) {
-        console.log('Configure by ' + process.argv[0] + ' ' + process.argv[1] + ' <api key>');
+      console.log('Usage: ');
+      console.log(noptUsage(knownOpts, shortHands, description));
+      // console.log('Configure by ' + process.argv[0] + ' ' + process.argv[1] + ' <api key>');
     }
     else {
       getConfig(importData);
@@ -55,8 +87,10 @@ function getConfig(next) {
       next();
     }
     else {
-      console.log(response.hits);
-      console.log('Configure by ' + process.argv[0] + ' ' + process.argv[1] + ' <api key>');
+      // console.log(response.hits);
+      console.log('Usage: ');
+      console.log(noptUsage(knownOpts, shortHands, description));
+      // console.log('Configure by ' + process.argv[0] + ' ' + process.argv[1] + ' <api key>');
       return;
     }
   });
@@ -78,7 +112,10 @@ function importData(next) {
       console.warn("search got error: " + JSON.stringify(error));
       return;
     }
-    if (response && response.hits && response.hits.hits && response.hits.hits[0] && response.hits.hits[0].fields && response.hits.hits[0].fields.timestamp) {
+    if (firstDate) {
+      console.log("Setting first time to " + firstDate);
+    }
+    else if (response && response.hits && response.hits.hits && response.hits.hits[0] && response.hits.hits[0].fields && response.hits.hits[0].fields.timestamp) {
       console.log("Setting first time to " + response.hits.hits[0].fields.timestamp);
       firstDate = new Date(response.hits.hits[0].fields.timestamp);
     }
@@ -89,7 +126,7 @@ function importData(next) {
     var url = 'https://www.rescuetime.com/anapi/data?key=' + apiKey +
       '&format=json&op=select&pv=interval&rs=minute' +
       '&restrict_begin=' + firstDate.toISOString().substring(0, 10) +
-      '&restrict_end=' + new Date().toISOString().substring(0, 10);
+      '&restrict_end=' + lastDate.toISOString().substring(0, 10);
     console.log(url);
     request(url, function(error, response, body) {
       if (error || !response || !body) {
