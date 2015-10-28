@@ -1,4 +1,33 @@
-var request = require("request");
+var request = require('request');
+var nopt = require('nopt'),
+ noptUsage = require("nopt-usage"),
+ knownOpts = {
+    'url': [String, null],
+    'help': Boolean,
+    'start': Date,
+    'end': Date
+  },
+  shortHands = {
+    'h': ['--help'],
+    'u': ['--url'],
+    's': ['--start'],
+    'e': ['--end']
+  },
+  description = {
+    'url': ' Store the URI location of your Tracktime instance and exit',
+    'help': ' This usage text',
+    'start': ' Start date as YYYY-MM-DD',
+    'end': ' End date as YYYY-MM-DD'
+  },
+  options = nopt(knownOpts, shortHands, process.argv, 0);
+
+// console.log(options);
+if (options['help']) {
+  console.log('Usage: ');
+  console.log(noptUsage(knownOpts, shortHands, description));
+  process.exit();
+}
+
 var elasticsearch = require('elasticsearch');
 var client = new elasticsearch.Client({
   host: 'localhost:9200',
@@ -7,7 +36,8 @@ var client = new elasticsearch.Client({
 
 var INDEX_NAME = 'correl8';
 
-var firstDate;
+var firstDate = options['start'] || null;
+var lastDate = options['end'] || null;
 var apiUrl;
 
 var acts = [
@@ -110,10 +140,10 @@ for (var i=1; i<acts.length; i++) {
 var withValues = ['', 'alone', 'partner', 'parent', 'kids', 'family', 'others'];
 var configIndex = {index: 'config', type: 'config-adapter'};
 
-if (process.argv[2]) {
+if (options['url']) {
   var params = configIndex;
   params.id = 'config-adapter-time';
-  params.body = {id: params.id, url: process.argv[2]};
+  params.body = {id: params.id, url: options['url']};
   client.index(params, function (error, response) {
     if (error) {
       console.warn(error);
@@ -127,7 +157,9 @@ if (process.argv[2]) {
 else {
   client.indices.exists({index: 'config'}, function(error, response) {
     if (!response) {
-        console.log('Configure by ' + process.argv[0] + ' ' + process.argv[1] + ' <tracktime_url>');
+        console.log('Usage: ');
+        console.log(noptUsage(knownOpts, shortHands, description));
+        // console.log('Configure by ' + process.argv[0] + ' ' + process.argv[1] + ' <tracktime_url>');
     }
     else {
       getConfig(importData);
@@ -152,7 +184,8 @@ function getConfig(next) {
       next();
     }
     else {
-      console.log('Configure by ' + process.argv[0] + ' ' + process.argv[1] + ' <tracktime_url>');
+      console.log('Usage: ');
+      console.log(noptUsage(knownOpts, shortHands, description));
     }
   });
 }
@@ -173,7 +206,10 @@ function importData(next) {
       console.warn("search got error: " + JSON.stringify(error));
       return;
     }
-    if (response && response.hits && response.hits.hits && response.hits.hits[0] && response.hits.hits[0].fields && response.hits.hits[0].fields.timestamp) {
+    if (firstDate) {
+      console.log("Setting first time to " + firstDate);
+    }
+    else if (response && response.hits && response.hits.hits && response.hits.hits[0] && response.hits.hits[0].fields && response.hits.hits[0].fields.timestamp) {
       console.log("Setting first time to " + response.hits.hits[0].fields.timestamp);
       firstDate = new Date(response.hits.hits[0].fields.timestamp);
     }
@@ -181,7 +217,11 @@ function importData(next) {
       console.warn("No previously indexed data, setting first time to 1!");
       firstDate = 1;
     }
-    var url = apiUrl + '?starttime=' + Math.floor(firstDate/1000)
+    var url = apiUrl + '?starttime=' + Math.floor(firstDate/1000);
+    if (lastDate) {
+      console.log("Setting last time to " + lastDate);
+      url += '&endtime=' + Math.ceil(lastDate/1000);
+    }
     // console.log(url);
     request(url, function(error, response, body) {
       if (error || !response || !body) {
@@ -194,7 +234,7 @@ function importData(next) {
           bulk.push({index: {_index: INDEX_NAME + '-time', _type: 'time', _id: data[i].id}});
           data[i].starttime = new Date(data[i].starttime);
           data[i].endtime = new Date(data[i].endtime);
-          data[i].duration = data[i].endtime - data[i].starttime;
+          data[i].duration = (data[i].endtime - data[i].starttime)/1000;
           data[i].timestamp = data[i].starttime;
           data[i].location = locs[data[i].location];
           data[i].mainparent = parents[data[i].mainaction];
