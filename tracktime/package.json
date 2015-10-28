@@ -5,6 +5,8 @@
   "main": "app.js",
   "dependencies": {
     "elasticsearch": "^8.2.0",
+    "nopt": "^3.0.4",
+    "nopt-usage": "^0.1.0",
     "request": "^2.65.0"
   },
   "devDependencies": {},
