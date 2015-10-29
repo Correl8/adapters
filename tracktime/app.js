@@ -1,54 +1,26 @@
-var request = require('request');
-var nopt = require('nopt'),
- noptUsage = require("nopt-usage"),
- knownOpts = {
-    'url': [String, null],
-    'help': Boolean,
-    'init': Boolean,
-    'clear': Boolean,
-    'start': Date,
-    'end': Date
-  },
-  shortHands = {
-    'h': ['--help'],
-    'i': ['--init'],
-    'c': ['--clear'],
-    'u': ['--url'],
-    's': ['--start'],
-    'e': ['--end']
-  },
-  description = {
-    'url': ' Store the URI of your Tracktime instance and exit',
-    'help': ' Display this usage text and exit',
-    'init': ' Create the index and exit',
-    'clear': ' Clear all data in the index',
-    'start': ' Start date as YYYY-MM-DD',
-    'end': ' End date as YYYY-MM-DD'
-  },
-  options = nopt(knownOpts, shortHands, process.argv, 2);
+var request = require("request");
+var correl8 = require("correl8");
+var nopt = require('nopt');
+var noptUsage = require("nopt-usage");
 
-// console.log(options);
-if (options['help']) {
-  console.log('Usage: ');
-  console.log(noptUsage(knownOpts, shortHands, description));
-  process.exit();
-}
+var c8 = correl8('tracktime');
 
-var elasticsearch = require('elasticsearch');
-var client = new elasticsearch.Client({
-  host: 'localhost:9200',
-  log: 'warning'
-});
-
-var INDEX_BASE = 'correl8';
-var sensor = 'time';
-var CONFIG_BASE = 'config-adapter';
-var CONFIG_INDEX = 'config';
-
-var firstDate = options['start'] || null;
-var lastDate = options['end'] || null;
+var fields = {
+  id: 'integer',
+  starttime: 'date',
+  endtime: 'date',
+  duration: 'integer',
+  mainaction: 'string',
+  sideaction: 'string',
+  maincategory: 'string',
+  sidecategory: 'string',
+  with: 'text',
+  usecomputer: 'boolean',
+  location: 'string',
+  description: 'text',
+  rating: 'integer'
+};
 var apiUrl;
-
 var acts = [
   'Unspecified',
   'Sleep',
@@ -147,74 +119,89 @@ for (var i=1; i<acts.length; i++) {
 }
 
 var withValues = ['', 'alone', 'partner', 'parent', 'kids', 'family', 'others'];
-var configIndex = {index: CONFIG_INDEX, type: CONFIG_BASE};
 
-if (options['url']) {
-  var params = configIndex;
-  params.id = CONFIG_BASE + '-' + sensor;
-  params.body = {id: params.id, url: options['url']};
-  client.index(params, function (error, response) {
-    if (error) {
-      console.warn(error);
-      res.json(error);
-      return;
-    }
-    console.log('Configuration saved.');
-    process.exit();
+var knownOpts = {
+    'url': [String, null],
+    'help': Boolean,
+    'init': Boolean,
+    'clear': Boolean,
+    'start': Date,
+    'end': Date
+  },
+  shortHands = {
+    'h': ['--help'],
+    'i': ['--init'],
+    'c': ['--clear'],
+    'u': ['--url'],
+    'from': ['--start'],
+    's': ['--start'],
+    'to': ['--end'],
+    'e': ['--end']
+  },
+  description = {
+    'url': ' Store the URI of your Tracktime instance and exit',
+    'help': ' Display this usage text and exit',
+    'init': ' Create the index and exit',
+    'clear': ' Clear all data in the index',
+    'start': ' Start date as YYYY-MM-DD',
+    'end': ' End date as YYYY-MM-DD'
+  },
+  options = nopt(knownOpts, shortHands, process.argv, 2);
+var firstDate = options['start'] || null;
+var lastDate = options['end'] || null;
+
+// console.log(options);
+if (options['help']) {
+  console.log('Usage: ');
+  console.log(noptUsage(knownOpts, shortHands, description));
+}
+else if (options['url']) {
+  c8.config({url: options['url']}).then(function(){
+    console.log('Configuration stored.');
+    c8.release();
+  });
+}
+else if (options['clear']) {
+  c8.clear().then(function(res) {
+    console.log('Index cleared.');
+    c8.release();
+  }).catch(function(error) {
+    console.trace(error);
+    c8.release();
+  });
+}
+else if (options['init']) {
+  c8.init(fields).then(function(res) {
+    console.log('Index initialized.');
+    c8.release();
+  }).catch(function(error) {
+    console.trace(error);
+    c8.release();
   });
 }
 else {
-  client.indices.exists({index: CONFIG_INDEX}, function(error, response) {
-    if (!response) {
-        console.log('Usage: ');
-        console.log(noptUsage(knownOpts, shortHands, description));
-        // console.log('Configure by ' + process.argv[0] + ' ' + process.argv[1] + ' <tracktime_url>');
+  c8.config().then(function(res) {
+    if (res.hits && res.hits.hits && res.hits.hits[0] && res.hits.hits[0]._source['url']) {
+      // console.log(res.hits.hits[0]);
+      apiUrl = res.hits.hits[0]._source['url'];
+      // console.log('Url set to ' + apiUrl);
+      importData();
     }
     else {
-      getConfig(importData);
-    }
-  });
-}
-
-function getConfig(next) {
-  var params = configIndex;
-  params.q = CONFIG_BASE + '-' + sensor;
-  params.body = {
-    fields: ['url'],
-    size: 1
-  }
-  client.search(params, function (error, response) {
-    if (error) {
-      console.warn("Config search got error: " + JSON.stringify(error));
-      return;
-    }
-    if (response && response.hits && response.hits.hits) {
-      apiUrl = response.hits.hits[0].fields.url;
-      next();
-    }
-    else {
-      console.log('Usage: ');
+      console.log('Configure first using --url. Usage: ');
       console.log(noptUsage(knownOpts, shortHands, description));
+      c8.release();
     }
   });
 }
 
 function importData(next) {
   // console.log('Getting first date...');
-  var query = {
-    index: INDEX_BASE + '-' + sensor,
-    type: sensor,
-    body: {
-      fields: ['timestamp'],
-      size: 1,
-      sort: [{'timestamp': 'desc'}],
-    }
-  };
-  client.search(query, function (error, response) {
-    if (error) {
-      console.warn("search got error: " + JSON.stringify(error));
-      return;
-    }
+  c8.search({
+    fields: ['timestamp'],
+    size: 1,
+    sort: [{'timestamp': 'desc'}],
+  }).then(function(response) {
     if (firstDate) {
       console.log("Setting first time to " + firstDate);
     }
@@ -223,24 +210,26 @@ function importData(next) {
       firstDate = new Date(response.hits.hits[0].fields.timestamp);
     }
     else {
-      console.warn("No previously indexed data, setting first time to 1!");
-      firstDate = 1;
+      console.warn("No previously indexed data, setting first time to 0!");
+      firstDate = new Date(0);
     }
     var url = apiUrl + '?starttime=' + Math.floor(firstDate/1000);
     if (lastDate) {
       console.log("Setting last time to " + lastDate);
       url += '&endtime=' + Math.ceil(lastDate/1000);
     }
+    var cookieJar = request.jar();
     // console.log(url);
-    request(url, function(error, response, body) {
+    request({url: url, jar: cookieJar}, function(error, response, body) {
       if (error || !response || !body) {
         // console.warn('Error getting data: ' + JSON.stringify(response.body));
       }
+      // console.log(body);
       var data = JSON.parse(body);
       if (data && data.length) {
         var bulk = [];
         for (var i=0; i<data.length; i++) {
-          bulk.push({index: {_index: INDEX_BASE + '-' + sensor, _type: sensor, _id: data[i].id}});
+          bulk.push({index: {_index: c8.index(), _type: c8.type(), _id: data[i].id}});
           data[i].starttime = new Date(data[i].starttime);
           data[i].endtime = new Date(data[i].endtime);
           data[i].duration = (data[i].endtime - data[i].starttime)/1000;
@@ -267,24 +256,14 @@ function importData(next) {
           console.log(data[i].timestamp);
         }
         // console.log(bulk);
-        client.bulk(
-          {
-            index: INDEX_BASE + '-' + sensor,
-            type: sensor,
-            body: bulk
-          },
-          function (error, response) {
-            if (error) {
-              console.warn('ES Error: ' + error);
-            }
-            // console.log(response);
-            // console.log('Done ' + doneCount++);
-          }
-        );
+        c8.bulk(bulk).then(function(result) {
+          console.log('Indexed ' + result.items.length + ' documents in ' + result.took + ' ms.');
+          c8.release();
+        }).catch(function(error) {
+          console.trace(error);
+          c8.release();
+        });
       }
     });
   });
-  if (next) {
-    next();
-  }
 }
