@@ -75,7 +75,7 @@ else if (options['init']) {
 }
 else {
   c8.config().then(function(res) {
-    if (res.hits && res.hits.hits && res.hits.hits[0]) {
+    if (res.hits && res.hits.hits && res.hits.hits[0] && res.hits.hits[0]._source['url']) {
       // console.log(res.hits.hits[0]);
       apiUrl = res.hits.hits[0]._source['url'];
       // console.log('Url set to ' + apiUrl);
@@ -129,7 +129,7 @@ function importData(next) {
             dayData[j].id = id;
             dayData[j].timestamp = dayData[j].date;
             bulk.push(dayData[j]);
-            // console.log(dayData[j]);
+            console.log(dayData[j]);
           }
         }
         // console.log(bulk);
