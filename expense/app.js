@@ -4,11 +4,15 @@ var nopt = require('nopt'),
  knownOpts = {
     'url': [String, null],
     'help': Boolean,
+    'init': Boolean,
+    'clear': Boolean,
     'start': Date,
     'end': Date
   },
   shortHands = {
     'h': ['--help'],
+    'i': ['--init'],
+    'c': ['--clear'],
     'u': ['--url'],
     's': ['--start'],
     'e': ['--end']
@@ -16,6 +20,8 @@ var nopt = require('nopt'),
   description = {
     'url': ' Store the URI of your Expense instance and exit',
     'help': ' Display this usage text and exit',
+    'init': ' Create the index and exit',
+    'clear': ' Clear all data in the index',
     'start': ' Start date as YYYY-MM-DD',
     'end': ' End date as YYYY-MM-DD'
   },
@@ -34,29 +40,31 @@ var client = new elasticsearch.Client({
   log: 'warning'
 });
 
-var INDEX_NAME = 'correl8';
+var INDEX_BASE = 'correl8';
+var sensor = 'expense';
+var CONFIG_BASE = 'config-adapter';
+var CONFIG_INDEX = 'config';
 
 var firstDate = options['start'] || null;
 var lastDate = options['end'] || null;
 var apiUrl;
-var configIndex = {index: 'config', type: 'config-adapter'};
+var configIndex = {index: CONFIG_INDEX, type: CONFIG_BASE};
 
 if (options['url']) {
   var params = configIndex;
-  params.id = 'config-adapter-expense';
+  params.id = CONFIG_BASE + '-' + sensor;
   params.body = {id: params.id, url: options['url']};
-  client.index(params, function (error, response) {
-    if (error) {
-      console.warn(error);
-      res.json(error);
-      return;
-    }
+  client.index(params).then(function (response) {
     console.log('Configuration saved.');
-    process.exit();
+  }).catch(function(error) {
+    console.warn(error);
   });
+  process.exit();
+}
+else if (options['clear']) {
 }
 else {
-  client.indices.exists({index: 'config'}, function(error, response) {
+  client.indices.exists({index: CONFIG_INDEX}, function(error, response) {
     if (!response) {
         console.log('Usage: ');
         console.log(noptUsage(knownOpts, shortHands, description));
@@ -70,7 +78,7 @@ else {
 
 function getConfig(next) {
   var params = configIndex;
-  params.q = 'id:config-adapter-expense',
+  params.q = 'id:' + CONFIG_BASE + '-' + sensor,
   params.body = {
     fields: ['url'],
     size: 1
@@ -95,8 +103,8 @@ function getConfig(next) {
 function importData(next) {
   // console.log('Getting first date...');
   var query = {
-    index: INDEX_NAME + '-expense',
-    type: 'expense',
+    index: INDEX_BASE + '-' + sensor,
+    type: sensor,
     body: {
       fields: ['timestamp'],
       size: 1,
@@ -124,7 +132,7 @@ function importData(next) {
       url += '&to=' + lastDate.getDay() + '.' + (lastDate.getMonth() + 1) + '.' + lastDate.getFullYear();
     }
     var cookieJar = request.jar();
-    console.log(url);
+    // console.log(url);
     request({url: url, jar: cookieJar}, function(error, response, body) {
       if (error || !response || !body) {
         // console.warn('Error getting data: ' + JSON.stringify(response.body));
@@ -137,7 +145,7 @@ function importData(next) {
           var dayData = data[i];
           for (var j=0; j<dayData.length; j++) {
             var id = dayData[j].date + '-' + dayData[j].t;
-            bulk.push({index: {_index: INDEX_NAME + '-expense', _type: 'expense', _id: id}});
+            bulk.push({index: {_index: INDEX_BASE + '-' + sensor, _type: sensor, _id: id}});
             dayData[j].id = id;
             dayData[j].timestamp = dayData[j].date;
             bulk.push(dayData[j]);
@@ -147,8 +155,8 @@ function importData(next) {
         // console.log(bulk);
         client.bulk(
           {
-            index: INDEX_NAME + '-expense',
-            type: 'expense',
+            index: INDEX_BASE + '-' + sensor,
+            type: sensor,
             body: bulk
           },
           function (error, response) {
