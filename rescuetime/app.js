@@ -4,11 +4,15 @@ var nopt = require('nopt'),
  knownOpts = {
     'key': [String, null],
     'help': Boolean,
+    'init': Boolean,
+    'clear': Boolean,
     'start': Date,
     'end': Date
   },
   shortHands = {
     'h': ['--help'],
+    'i': ['--init'],
+    'c': ['--clear'],
     'k': ['--key'],
     's': ['--start'],
     'e': ['--end']
@@ -16,6 +20,8 @@ var nopt = require('nopt'),
   description = {
     'key': ' Store your RescueTime API key and exit',
     'help': ' Display this usage text and exit',
+    'init': ' Create the index and exit',
+    'clear': ' Clear all data in the index',
     'start': ' Start date as YYYY-MM-DD',
     'end': ' End date as YYYY-MM-DD'
   },
@@ -34,18 +40,20 @@ var client = new elasticsearch.Client({
   log: 'warning'
 });
 
-var INDEX_NAME = 'correl8';
+var INDEX_BASE = 'correl8';
+var sensor = 'rescuetime';
+var CONFIG_BASE = 'config-adapter';
+var CONFIG_INDEX = 'config';
 
 var firstDate = options['start'] || null;
 var lastDate = options['end'] || new Date();
 var apiKey;
 
-// var withValues = ['', 'alone', 'partner', 'parent', 'kids', 'family', 'others'];
-var configIndex = {index: 'config', type: 'config-adapter'};
+var configIndex = {index: CONFIG_INDEX, type: CONFIG_BASE};
 
 if (options['key']) {
   var params = configIndex;
-  params.id = 'config-adapter-rescuetime';
+  params.id = CONFIG_BASE + '-' + sensor;
   params.body = {id: params.id, apiKey: options['key']};
   client.index(params, function (error, response) {
     if (error) {
@@ -57,8 +65,22 @@ if (options['key']) {
     process.exit();
   });
 }
+else if (options['clear']) {
+  var params = configIndex;
+  params.id = INDEX_BASE + '-' + sensor;
+  params.body = {query: {match_all: {}}};
+  client.delete(params, function (error, response) {
+    if (error) {
+      console.warn(error);
+      res.json(error);
+      return;
+    }
+    console.log('Configuration saved.');
+    process.exit();
+  });
+}
 else {
-  client.indices.exists({index: 'config'}, function(error, response) {
+  client.indices.exists({index: CONFIG_INDEX}, function(error, response) {
     if (!response) {
       console.log('Usage: ');
       console.log(noptUsage(knownOpts, shortHands, description));
@@ -72,7 +94,7 @@ else {
 
 function getConfig(next) {
   var params = configIndex;
-  params.q = 'id:config-adapter-rescuetime',
+  params.q = 'id:' + CONFIG_BASE + '-' + sensor,
   params.body = {
     fields: ['apiKey'],
     size: 1
@@ -99,8 +121,8 @@ function getConfig(next) {
 function importData(next) {
   // console.log('Getting first date...');
   var query = {
-    index: INDEX_NAME + '-rescuetime',
-    type: 'rescuetime',
+    index: INDEX_BASE + '-' + sensor,
+    type: sensor,
     body: {
       fields: ['timestamp'],
       size: 1,
@@ -140,7 +162,7 @@ function importData(next) {
       if (data && data.length) {
         var bulk = [];
         for (var i=0; i<data.length; i++) {
-          bulk.push({index: {_index: INDEX_NAME + '-rescuetime', _type: 'rescuetime'}});
+          bulk.push({index: {_index: INDEX_BASE + '-' + sensor, _type: sensor}});
           bulk.push({
             timestamp: data[i][0],
             spent: data[i][1],
@@ -154,8 +176,8 @@ function importData(next) {
         // console.log(bulk);
         client.bulk(
           {
-            index: INDEX_NAME + '-rescuetime',
-            type: 'rescuetime',
+            index: INDEX_BASE + '-' + sensor,
+            type: sensor,
             body: bulk
           },
           function (error, response) {
