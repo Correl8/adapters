@@ -4,7 +4,7 @@
   "description": "Import data from Tracktime into Correl8.me",
   "main": "app.js",
   "dependencies": {
-    "elasticsearch": "^8.2.0",
+    "correl8": "^0.0.2",
     "nopt": "^3.0.4",
     "nopt-usage": "^0.1.0",
     "request": "^2.65.0"
