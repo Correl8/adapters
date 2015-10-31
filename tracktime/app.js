@@ -229,7 +229,7 @@ function importData() {
       if (data && data.length) {
         var bulk = [];
         for (var i=0; i<data.length; i++) {
-          bulk.push({index: {_index: c8.index(), _type: c8.type(), _id: data[i].id}});
+          bulk.push({index: {_index: c8._index, _type: c8._type, _id: data[i].id}});
           data[i].starttime = new Date(data[i].starttime);
           data[i].endtime = new Date(data[i].endtime);
           data[i].duration = (data[i].endtime - data[i].starttime)/1000;

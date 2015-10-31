@@ -122,7 +122,7 @@ function importData() {
         var bulk = [];
         for (var i=0; i<data.length; i++) {
           var id = data[i][0] + '-' + data[i][3]; // unique enough?
-          bulk.push({index: {_index: c8.index(), _type: c8.type(), _id: id}});
+          bulk.push({index: {_index: c8._index, _type: c8._type, _id: id}});
           bulk.push({
             timestamp: data[i][0],
             spent: data[i][1],

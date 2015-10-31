@@ -4,7 +4,7 @@
   "description": "Import data from Expense into Correl8.me",
   "main": "app.js",
   "dependencies": {
-    "correl8": "^0.0.2",
+    "correl8": "^0.0.3",
     "nopt": "^3.0.4",
     "nopt-usage": "^0.1.0",
     "request": "^2.65.0"
