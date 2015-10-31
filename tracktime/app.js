@@ -19,6 +19,7 @@ var fields = {
   with: 'text',
   usecomputer: 'boolean',
   location: 'string',
+  locid: 'integer',
   description: 'text',
   rating: 'integer'
 };
@@ -236,13 +237,14 @@ function importData() {
           data[i].endtime = new Date(data[i].endtime);
           data[i].duration = (data[i].endtime - data[i].starttime)/1000;
           data[i].timestamp = data[i].starttime;
-          data[i].location = locs[data[i].location];
           data[i].mainid = data[i].mainaction;
           data[i].mainaction = acts[data[i].mainaction];
           data[i].maincategory = parents[data[i].mainid];
           data[i].sideid = data[i].sideaction;
           data[i].sideaction = acts[data[i].sideaction];
           data[i].sidecategory = parents[data[i].sideid];
+          data[i].locid = data[i].location;
+          data[i].location = locs[data[i].location];
           if (data[i]['with'] == 1) {
             data[i]['with'] = 'alone';
           }
