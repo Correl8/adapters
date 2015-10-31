@@ -4,9 +4,11 @@
   "description": "Import data from Moves app into Correl8.me",
   "main": "app.js",
   "dependencies": {
-    "elasticsearch": "^8.2.0",
-    "moves": "0.0.2",
-    "moves-date": "^0.1.2"
+    "correl8": "^0.0.2",
+    "express": "^4.13.3",
+    "moves": "^0.0.2",
+    "moves-date": "^0.1.2",
+    "prompt": "^0.2.14"
   },
   "devDependencies": {},
   "scripts": {
