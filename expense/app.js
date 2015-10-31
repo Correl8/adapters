@@ -129,7 +129,7 @@ function importData() {
             dayData[j].id = id;
             dayData[j].timestamp = dayData[j].date;
             bulk.push(dayData[j]);
-            console.log(dayData[j]);
+            console.log(dayData[j].date);
           }
         }
         // console.log(bulk);
