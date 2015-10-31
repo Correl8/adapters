@@ -239,10 +239,10 @@ function importData() {
           data[i].location = locs[data[i].location];
           data[i].mainid = data[i].mainaction;
           data[i].mainaction = acts[data[i].mainaction];
-          data[i].maincategory = parents[data[i].mainaction];
+          data[i].maincategory = parents[data[i].mainid];
           data[i].sideid = data[i].sideaction;
           data[i].sideaction = acts[data[i].sideaction];
-          data[i].sidecategory = parents[data[i].sideaction];
+          data[i].sidecategory = parents[data[i].sideid];
           if (data[i]['with'] == 1) {
             data[i]['with'] = 'alone';
           }
