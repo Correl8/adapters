@@ -4,7 +4,7 @@
   "description": "Import data from Expense into Correl8.me",
   "main": "app.js",
   "dependencies": {
-    "correl8": "^0.0.1",
+    "correl8": "^0.0.2",
     "nopt": "^3.0.4",
     "nopt-usage": "^0.1.0",
     "request": "^2.65.0"
@@ -14,6 +14,6 @@
     "start": "node --harmony app.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "author": "Samuel Rinnetmäki",
+  "author": "Samuel Rinnetmäki <samuel@iki.fi>",
   "license": "ISC"
 }

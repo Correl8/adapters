@@ -14,6 +14,6 @@
     "start": "node --harmony app.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "author": "Samuel Rinnetmäki",
+  "author": "Samuel Rinnetmäki <samuel@iki.fi>",
   "license": "ISC"
 }
