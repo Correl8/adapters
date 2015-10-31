@@ -87,7 +87,7 @@ else {
   });
 }
 
-function importData(next) {
+function importData() {
   // console.log('Getting first date...');
   c8.search({
     fields: ['timestamp'],
