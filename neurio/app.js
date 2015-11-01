@@ -180,9 +180,15 @@ function importData() {
                 var locId = user.locations[i].id;
                 getPage(client, locId, firstDate, lastDate, null, EVENTS_PER_PAGE, 1);
               }
+            }).catch(function(error) {
+              console.trace(error);
             });
           }
+        }).catch(function(error) {
+          console.trace(error);
         });
+      }).catch(function(error) {
+        console.trace(error);
       });
     }
   });
