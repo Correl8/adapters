@@ -8,7 +8,10 @@
     "express": "^4.13.3",
     "moves": "^0.0.2",
     "moves-date": "^0.1.2",
-    "prompt": "^0.2.14"
+    "prompt": "^0.2.14",
+    "nopt": "^3.0.4",
+    "nopt-usage": "^0.1.0",
+    "request": "^2.65.0"
   },
   "devDependencies": {},
   "scripts": {
