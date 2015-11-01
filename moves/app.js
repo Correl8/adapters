@@ -406,9 +406,14 @@ function splitToBulk(document) {
       seg.timestamp = seg.startTime;
       if (seg.type === 'place') {
         seg.position = seg.place.location.position;
+        seg.id = seg.timestamp + '-' + seg.place.id;
+        c8.type(placeType);
       }
-      c8.type(seg.type == 'place' ? placeType : moveType);
-      bulk.push({index: {_index: c8._index, _type: c8._type}});
+      else {
+        c8.type(moveType);
+        seg.id = seg.timestamp + '-' + seg.activity;
+      }
+      bulk.push({index: {_index: c8._index, _type: c8._type, _id: seg.id}});
       bulk.push(seg);
     }
   }
