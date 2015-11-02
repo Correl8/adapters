@@ -6,14 +6,18 @@ var noptUsage = require('nopt-usage');
 var neurio = require('neurio');
 var moment = require('moment');
 
-var c8 = correl8('neurio');
+var applianceType = 'neurio';
+var energyType = 'neurio-energy';
+var c8 = correl8(applianceType);
 var defaultPort = 3000;
 var defaultUrl = 'http://localhost:' + defaultPort + '/';
 var MAX_DAYS = 10;
-// var MAX_PAGES = 100000;
-// var MAX_PAGES = 470;
-var MAX_PAGES = 2;
+var MAX_PAGES = 5;
 var EVENTS_PER_PAGE = 100;
+var MIN_POWER = 400;
+// maximum granularity is 5 minutes
+var GRANULARITY = 'minutes';
+var FREQUENCY = 5;
 
 var fields = {
   appliance: {
@@ -52,6 +56,14 @@ var fields = {
   isConfirmed: 'boolean',
   id: 'string'
 };
+
+var energyFields = {
+  timestamp: 'date',
+  start: 'date',
+  end: 'date',
+  duration: 'integer',
+  consumptionEnergy: 'integer'
+}
 
 var knownOpts = {
   'authenticate': Boolean,
@@ -118,7 +130,9 @@ else if (options['authenticate']) {
   });
 }
 else if (options['clear']) {
-  c8.clear().then(function(res) {
+  c8.type(applianceType).clear().then(function() {
+    return c8.type(energyType).clear();
+  }).then(function(res) {
     console.log('Index cleared.');
     c8.release();
   }).catch(function(error) {
@@ -127,8 +141,11 @@ else if (options['clear']) {
   });
 }
 else if (options['init']) {
-  c8.init(fields).then(function() {
+  c8.type(applianceType).init(fields).then(function() {
+    return c8.type(energyType).init(energyFields);
+  }).then(function() {
     console.log('Index initialized.');
+    // console.log(c8.type(energyType));
   }).catch(function(error) {
     console.trace(error);
     c8.release();
@@ -147,7 +164,7 @@ function importData() {
       auth.simple(conf.clientId, conf.clientSecret).then(function (client) {
         client.user().then(function(user) {
           if (user && user.locations && user.locations.length) {
-            c8.search({
+            c8.type(energyType).search({
               fields: ['timestamp'],
               size: 1,
               sort: [{'timestamp': 'desc'}],
@@ -178,7 +195,11 @@ function importData() {
               }
               for (var i=0; i<user.locations.length; i++) {
                 var locId = user.locations[i].id;
-                getPage(client, locId, firstDate, lastDate, null, EVENTS_PER_PAGE, 1);
+                getAppliancePage(client, locId, firstDate, lastDate, MIN_POWER, EVENTS_PER_PAGE, 1);
+                for (var j=0; j<user.locations[i].sensors.length; j++) {
+                  var sensorId = user.locations[i].sensors[j].id;
+                  getEnergyStats(client, sensorId, firstDate, lastDate, GRANULARITY, FREQUENCY);
+                }
               }
             }).catch(function(error) {
               console.trace(error);
@@ -194,7 +215,7 @@ function importData() {
   });
 }
 
-function getPage(client, locId, firstDate, lastDate, minPower, perPage, page) {
+function getAppliancePage(client, locId, firstDate, lastDate, minPower, perPage, page) {
   client.applianceEvents(locId, firstDate, lastDate, minPower, perPage, page).then(function(events) {
     // console.log(events);
     if (!events || !events.length) {
@@ -203,27 +224,58 @@ function getPage(client, locId, firstDate, lastDate, minPower, perPage, page) {
     var bulk = [];
     for (var j=0; j<events.length; j++) {
       var values = events[j];
-      values.timestamp = values.start;
-      values.duration = values.end - values.start;
+      values.timestamp = new Date(values.start);
+      values.duration = new Date(values.end).getTime() - new Date(values.start).getTime();
       var logStr = values.timestamp;
       if (values.appliance.label) {
         logStr += ' ' + values.appliance.label;
       }
       console.log(logStr);
       var id = values.id;
-      bulk.push({index: {_index: c8._index, _type: c8._type, _id: id}});
+      bulk.push({index: {_index: c8.type(applianceType)._index, _type: c8.type(applianceType)._type, _id: id}});
       bulk.push(values);
     }
-    c8.bulk(bulk).then(function(result) {
+    c8.type(applianceType).bulk(bulk).then(function(result) {
       console.log('Indexed ' + result.items.length + ' documents in ' + result.took + ' ms.');
       bulk = null;
       if (events.length == perPage) {
         // page was full, request the next page (recursion!)
         page++;
         if (page <= MAX_PAGES) {
-          getPage(client, locId, firstDate, lastDate, minPower, perPage, page);
+          getAppliancePage(client, locId, firstDate, lastDate, minPower, perPage, page);
         }
       }
+    }).catch(function(error) {
+      console.trace(error);
+      bulk = null;
+    });
+  }).catch(function(error) {
+    console.trace(error);
+  });
+}
+
+function getEnergyStats(client, sensorId, start, end, granularity, frequency) {
+  client.stats(sensorId, start, end, granularity, frequency).then(function (stats) {
+    var bulk = [];
+    for (var i=0; i<stats.length; i++) {
+      var values = stats[i];
+      values.timestamp = new Date(values.start);
+      values.duration = new Date(values.end).getTime() - new Date(values.start).getTime();
+      var consumption = values.consumptionEnergy || 0;
+      if (values.generationEnergy) {
+        consumption -= values.generationEnergy;
+      }
+      // console.log(values);
+      // console.log(consumption);
+      var logStr = values.timestamp + ' ' + consumption + ' Ws';
+      console.log(logStr);
+      var id = values.timestamp;
+      bulk.push({index: {_index: c8.type(energyType)._index, _type: c8.type(energyType)._type, _id: id}});
+      bulk.push(values);
+    }
+    c8.type(energyType).bulk(bulk).then(function(result) {
+      console.log('Indexed ' + result.items.length + ' documents in ' + result.took + ' ms.');
+      bulk = null;
     }).catch(function(error) {
       console.trace(error);
       bulk = null;
