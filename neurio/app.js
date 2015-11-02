@@ -225,7 +225,7 @@ function getAppliancePage(client, locId, firstDate, lastDate, minPower, perPage,
     for (var j=0; j<events.length; j++) {
       var values = events[j];
       values.timestamp = new Date(values.start);
-      values.duration = new Date(values.end).getTime() - new Date(values.start).getTime();
+      values.duration = (new Date(values.end).getTime() - new Date(values.start).getTime())/1000;
       var logStr = values.timestamp;
       if (values.appliance.label) {
         logStr += ' ' + values.appliance.label;
@@ -260,7 +260,7 @@ function getEnergyStats(client, sensorId, start, end, granularity, frequency) {
     for (var i=0; i<stats.length; i++) {
       var values = stats[i];
       values.timestamp = new Date(values.start);
-      values.duration = new Date(values.end).getTime() - new Date(values.start).getTime();
+      values.duration = (new Date(values.end).getTime() - new Date(values.start).getTime())/1000;
       var consumption = values.consumptionEnergy || 0;
       if (values.generationEnergy) {
         consumption -= values.generationEnergy;
