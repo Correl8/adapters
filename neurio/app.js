@@ -7,6 +7,7 @@ var neurio = require('neurio');
 var moment = require('moment');
 
 var applianceType = 'neurio';
+var sampleType = 'neurio-samples';
 var energyType = 'neurio-energy';
 var c8 = correl8(applianceType);
 var defaultPort = 3000;
@@ -57,12 +58,23 @@ var fields = {
   id: 'string'
 };
 
+/*
+var sampleFields = {
+  timestamp: 'date',
+  consumptionEnergy: 'long',
+  consumptionPower: 'long',
+  generationEnergy: 'long',
+  generationPower: 'long'
+}
+*/
+
 var energyFields = {
   timestamp: 'date',
   start: 'date',
   end: 'date',
   duration: 'integer',
-  consumptionEnergy: 'integer'
+  consumptionEnergy: 'long',
+  generationEnergy: 'long'
 }
 
 var knownOpts = {
@@ -131,7 +143,9 @@ else if (options['authenticate']) {
 }
 else if (options['clear']) {
   c8.type(applianceType).clear().then(function() {
-    return c8.type(energyType).clear();
+    // return c8.type(sampleType).clear().then(function() {
+      return c8.type(energyType).clear();
+    // });
   }).then(function(res) {
     console.log('Index cleared.');
     c8.release();
@@ -142,10 +156,11 @@ else if (options['clear']) {
 }
 else if (options['init']) {
   c8.type(applianceType).init(fields).then(function() {
-    return c8.type(energyType).init(energyFields);
+    // return c8.type(sampleType).init(fields).then(function() {
+      return c8.type(energyType).init(energyFields);
+    // });
   }).then(function() {
     console.log('Index initialized.');
-    // console.log(c8.type(energyType));
   }).catch(function(error) {
     console.trace(error);
     c8.release();
@@ -198,6 +213,7 @@ function importData() {
                 getAppliancePage(client, locId, firstDate, lastDate, MIN_POWER, EVENTS_PER_PAGE, 1);
                 for (var j=0; j<user.locations[i].sensors.length; j++) {
                   var sensorId = user.locations[i].sensors[j].id;
+                  // getSamplesHistoryPage(client, sensorId, firstDate, lastDate, GRANULARITY, FREQUENCY, EVENTS_PER_PAGE, 1);
                   getEnergyStats(client, sensorId, firstDate, lastDate, GRANULARITY, FREQUENCY);
                 }
               }
@@ -243,6 +259,40 @@ function getAppliancePage(client, locId, firstDate, lastDate, minPower, perPage,
         page++;
         if (page <= MAX_PAGES) {
           getAppliancePage(client, locId, firstDate, lastDate, minPower, perPage, page);
+        }
+      }
+    }).catch(function(error) {
+      console.trace(error);
+      bulk = null;
+    });
+  }).catch(function(error) {
+    console.trace(error);
+  });
+}
+
+function getSamplesHistoryPage(client, sensorId, start, end, granularity, frequency, perPage, page) {
+  client.historySamples(sensorId, start, end, granularity, frequency, perPage, page).then(function (events) {
+    var bulk = [];
+    for (var i=0; i<events.length; i++) {
+      var values = events[i];
+      var power = values.consumptionPower || 0;
+      if (values.generationPower) {
+        power -= values.generationPower;
+      }
+      var logStr = values.timestamp + ' ' + power + ' W';
+      console.log(logStr);
+      var id = values.timestamp;
+      bulk.push({index: {_index: c8.type(sampleType)._index, _type: c8.type(sampleType)._type, _id: id}});
+      bulk.push(values);
+    }
+    c8.type(energyType).bulk(bulk).then(function(result) {
+      console.log('Indexed ' + result.items.length + ' documents in ' + result.took + ' ms.');
+      bulk = null;
+      if (events.length == perPage) {
+        // page was full, request the next page (recursion!)
+        page++;
+        if (page <= MAX_PAGES) {
+          getSamplesHistoryPage(client, sensorId, start, end, granularity, frequency, perPage, page);
         }
       }
     }).catch(function(error) {
