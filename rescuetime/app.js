@@ -122,16 +122,19 @@ function importData() {
         var bulk = [];
         for (var i=0; i<data.length; i++) {
           var id = data[i][0] + '-' + data[i][3]; // unique enough?
+          var tz = new Date().getTimezoneOffset();
+          var d = new Date(data[i][0]).getTime() + (tz * 60 * 1000);
+          var dString = new Date(d).toISOString();
           bulk.push({index: {_index: c8._index, _type: c8._type, _id: id}});
           bulk.push({
-            timestamp: data[i][0],
+            timestamp: dString,
             spent: data[i][1],
             people: data[i][2],
             activity: data[i][3],
             category: data[i][4],
             productivity: data[i][5]
           });
-          console.log(data[i][0]);
+          console.log(dString);
         }
         c8.bulk(bulk).then(function(result) {
           console.log('Indexed ' + result.items.length + ' documents in ' + result.took + ' ms.');
