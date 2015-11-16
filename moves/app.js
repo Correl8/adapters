@@ -225,12 +225,12 @@ else {
       }).then(function(response) {
         if (firstDate) {
           console.log('Setting first time to ' + firstDate);
-          importData(firstDate);
+          importData(firstDate, lastDate);
         }
         else if (response && response.hits && response.hits.hits && response.hits.hits[0] && response.hits.hits[0].fields && response.hits.hits[0].fields.timestamp) {
           console.log('Setting first time to ' + response.hits.hits[0].fields.timestamp);
           firstDate = new Date(response.hits.hits[0].fields.timestamp);
-          importData(firstDate);
+          importData(firstDate, lastDate);
         }
         else {
           moves.get('/user/profile', conf.access_token, function(error, response, body) {
@@ -253,7 +253,7 @@ else {
                 // console.log(user);
                 // console.log('Setting first time to Moves date ' + user.profile.firstDate);
                 firstDate = dates.parseISODate(user.profile.firstDate);
-                importData(firstDate);
+                importData(firstDate, lastDate);
               }
             }
           });
@@ -282,21 +282,21 @@ else {
   });
 }
 
-function importData(firstDate) {
+function importData(firstDate, lastDate) {
   if (!firstDate) {
     console.warn('No starting date...');
     return;
   }
   var startTime = firstDate;
   // startTime.setDate(startTime.getDate() + 1);
-  var now = dates.day(new Date());
   var fromDate = dates.day(startTime);
-  if (fromDate === now) {
+  var end = dates.day(lastDate);
+  if (fromDate === dates.day(new Date())) {
     console.log('Todays data already exists! Try again tomorrow...');
   }
   var dayCount = 0;
   var doneCount = 0;
-  while (fromDate < now) {
+  while (fromDate < end) {
     toDate = fromDate;
     moves.get('/user/storyline/daily?from=' + fromDate + '&to=' + toDate + '&trackPoints=true', conf.access_token, function(error, response, body) {
       if (error) {
