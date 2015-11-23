@@ -6,7 +6,7 @@ var noptUsage = require("nopt-usage");
 var c8 = correl8('tracktime');
 
 var fields = {
-  id: 'integer',
+  id: 'string', // actually integer, stored as string for compatibility
   starttime: 'date',
   endtime: 'date',
   duration: 'integer',
