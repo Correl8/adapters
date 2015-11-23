@@ -23,9 +23,13 @@ var placeFields = {
   type: 'string',
   startTime: 'date',
   endTime: 'date',
+  duration: 'integer',
   place: {
     id: 'integer',
     type: 'string',
+    foursquareId: 'string',
+    foursquareCategoryIds: 'string',
+    position: 'geo_point',
     location: {
       lat: 'float',
       lon: 'float',
@@ -405,7 +409,8 @@ function splitToBulk(document) {
       var seg = document.segments[i];
       seg.timestamp = seg.startTime;
       if (seg.type === 'place') {
-        seg.position = seg.place.location.position;
+        // seg.position = seg.place.location.position;
+        seg.duration = dates.parseISODate(seg.endTime) - dates.parseISODate(seg.startTime);
         seg.id = seg.timestamp + '-' + seg.place.id;
         c8.type(placeType);
       }
