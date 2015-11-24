@@ -23,13 +23,30 @@ var placeFields = {
   type: 'string',
   startTime: 'date',
   endTime: 'date',
-  duration: 'integer',
+  duration: 'float',
+  activities: {
+    activity: 'string',
+    group: 'string',
+    manual: 'boolean',
+    startTime: 'date',
+    endTime: 'date',
+    duration: 'float',
+    distance: 'float',
+    steps: 'integer',
+    calories: 'integer',
+    trackPoints: {
+      lat: 'float',
+      lon: 'float',
+      position: 'geo_point',
+      time: 'date'
+    }
+  },
   place: {
     id: 'integer',
     type: 'string',
     foursquareId: 'string',
     foursquareCategoryIds: 'string',
-    position: 'geo_point',
+    // position: 'geo_point',
     location: {
       lat: 'float',
       lon: 'float',
