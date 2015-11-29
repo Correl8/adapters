@@ -232,7 +232,8 @@ function importData() {
 }
 
 function getAppliancePage(client, locId, firstDate, lastDate, minPower, perPage, page) {
-  client.applianceEvents(locId, firstDate, lastDate, minPower, perPage, page).then(function(events) {
+  // client.applianceEvents(locId, firstDate, lastDate, minPower, perPage, page).then(function(events) {
+  client.applianceEventsRecent(locId, firstDate).then(function(events) {
     // console.log(events);
     if (!events || !events.length) {
       return;
