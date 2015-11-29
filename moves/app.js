@@ -23,9 +23,30 @@ var placeFields = {
   type: 'string',
   startTime: 'date',
   endTime: 'date',
+  duration: 'float',
+  activities: {
+    activity: 'string',
+    group: 'string',
+    manual: 'boolean',
+    startTime: 'date',
+    endTime: 'date',
+    duration: 'float',
+    distance: 'float',
+    steps: 'integer',
+    calories: 'integer',
+    trackPoints: {
+      lat: 'float',
+      lon: 'float',
+      position: 'geo_point',
+      time: 'date'
+    }
+  },
   place: {
     id: 'integer',
     type: 'string',
+    foursquareId: 'string',
+    foursquareCategoryIds: 'string',
+    // position: 'geo_point',
     location: {
       lat: 'float',
       lon: 'float',
@@ -405,7 +426,8 @@ function splitToBulk(document) {
       var seg = document.segments[i];
       seg.timestamp = seg.startTime;
       if (seg.type === 'place') {
-        seg.position = seg.place.location.position;
+        // seg.position = seg.place.location.position;
+        seg.duration = dates.parseISODate(seg.endTime) - dates.parseISODate(seg.startTime);
         seg.id = seg.timestamp + '-' + seg.place.id;
         c8.type(placeType);
       }
