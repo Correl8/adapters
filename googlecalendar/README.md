@@ -7,8 +7,11 @@ Run
 
     # initialize indices
     node app.js --init
-    # allow API access to your calendar, follow the instructions in the console
+    # allow API access to your calendar
     node app.js --authenticate client_secret.json
+
+Follow the instructions in the console to authorize the app and store the OAuth token.
+
     # first run with an initial date
     node app.js --from 2001-01-01
     # for next runs, date range is automatic
