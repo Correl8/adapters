@@ -164,7 +164,7 @@ lockFile.lock(lock, {}, function(er) {
   else {
     importData();
   }
-  lockFile.unlock('some-file.lock', function (er) {
+  lockFile.unlock(lock, function (er) {
     if (er) {
       console.error('Cannot release lockfile ' + lock + '!');
     }
