@@ -6,14 +6,11 @@ var correl8 = require('correl8');
 var nopt = require('nopt');
 var noptUsage = require('nopt-usage');
 var moment = require('moment');
-var express = require('express');
 var google = require('googleapis');
 var googleAuth = require('google-auth-library');
 
 var eventType = 'gcal-event';
 var c8 = correl8(eventType);
-var defaultPort = 3456;
-var defaultUrl = 'http://localhost:' + defaultPort + '/';
 var MS_IN_DAY = 24 * 60 * 60 * 1000;
 var MAX_DAYS = 10;
 var MAX_EVENTS = 100;
@@ -21,6 +18,9 @@ var SCOPES = ['https://www.googleapis.com/auth/calendar.readonly'];
 
 // 
 var fields = {
+  "timestamp": "date",
+  "calendar": "string",
+  "duration": "integer",
   "kind": "string",
   "etag": "string",
   "id": "string",
@@ -134,7 +134,7 @@ var shortHands = {
   'e': ['--end']
 };
 var description = {
-  'authenticate': ' Google API client credentials file (e.g. client_id.json)',
+  'authenticate': ' Google API credentials file (e.g. client_secret.json)',
   'help': ' Display this usage text and exit',
   'init': ' Create the index and exit',
   'clear': ' Clear all data in the index',
@@ -163,7 +163,6 @@ else if (options['authenticate']) {
     var clientSecret = conf.installed.client_secret;
     var clientId = conf.installed.client_id;
     var redirectUrl = conf.installed.redirect_uris[0];
-    // var redirectUrl = defaultUrl;
     var oauth2Client = new auth.OAuth2(clientId, clientSecret, redirectUrl);
     var authUrl = oauth2Client.generateAuthUrl({
       access_type: 'offline',
