@@ -1,0 +1,4 @@
+.trash
+node_modules
+npm-debug.log
+client_secret.json
