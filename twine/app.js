@@ -9,6 +9,7 @@ var c8 = correl8('twine');
 
 var fields = {
   meta: {
+    sensor: 'string',
     battery: 'string',
     wifiSignal: 'string'
   },
@@ -125,6 +126,8 @@ function importData() {
           console.trace(err);
           return;
         }
+        response._id = response.time.timestamp;
+        response.meta.sensor = conf.deviceId;
         response.timestamp = new Date(response.time.timestamp * 1000);
         console.log(response.timestamp);
         c8.insert(response).then(function(result) {
