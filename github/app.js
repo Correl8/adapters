@@ -213,10 +213,11 @@ function importData() {
           }
           for (var i=0; i<res.length; i++) {
             var repo = res[i];
-            // console.log(repo.name);
+            // console.log(JSON.stringify(repo));
             var msg = {
+              user: repo.owner.login,
               repo: repo.name,
-              user: conf.user,
+              author: conf.user,
               since: firstDate.toISOString(),
               until: lastDate.toISOString(),
               per_page: 100
@@ -224,8 +225,9 @@ function importData() {
             // console.log(msg);
             github.repos.getCommits(msg, function(err, subres) {
               if (err) {
-                if (err.code != 404) {
-                  console.error(err.message);
+                // don't bother with "not found" and "repo empty" messages
+                if ((err.code != 404) && (err.code != 409)) {
+                  console.error(err.code + ': ' + err.message);
                 }
                 return;
               }
