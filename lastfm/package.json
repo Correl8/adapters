@@ -1,0 +1,23 @@
+{
+  "name": "lastfm-import",
+  "version": "1.0.0",
+  "description": "Import data from Last.fm into Correl8.me",
+  "main": "app.js",
+  "dependencies": {
+    "correl8": "^0.0.3",
+    "lastfmapi": "^0.1.1",
+    "lockfile": "^1.0.1",
+    "moment": "^2.10.6",
+    "nopt": "^3.0.4",
+    "nopt-usage": "^0.1.0",
+    "path": "^0.12.7",
+    "prompt": "^0.2.14"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "start": "node --harmony app.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Samuel Rinnetmäki <samuel@iki.fi>",
+  "license": "ISC"
+}
