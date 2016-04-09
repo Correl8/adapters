@@ -6,12 +6,10 @@
   "dependencies": {
     "correl8": "^0.0.3",
     "express": "^4.13.3",
-    "moment": "^2.10.6",
     "neurio": "^0.3.0",
     "nopt": "^3.0.4",
     "nopt-usage": "^0.1.0",
     "prompt": "^0.2.14",
-    "request": "^2.65.0"
   },
   "devDependencies": {},
   "scripts": {

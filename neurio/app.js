@@ -1,10 +1,8 @@
-var request = require('request');
 var prompt = require('prompt');
 var correl8 = require('correl8');
 var nopt = require('nopt');
 var noptUsage = require('nopt-usage');
 var neurio = require('neurio');
-var moment = require('moment');
 
 var applianceType = 'neurio';
 var sampleType = 'neurio-samples';
