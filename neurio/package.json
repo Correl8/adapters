@@ -9,7 +9,7 @@
     "neurio": "^0.3.0",
     "nopt": "^3.0.4",
     "nopt-usage": "^0.1.0",
-    "prompt": "^0.2.14",
+    "prompt": "^0.2.14"
   },
   "devDependencies": {},
   "scripts": {
