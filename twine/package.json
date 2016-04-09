@@ -5,7 +5,7 @@
   "main": "app.js",
   "dependencies": {
     "bowline": "^2.0.0",
-    "correl8": "^0.0.3",
+    "correl8": "^0.0.5",
     "moment": "^2.10.6",
     "nopt": "^3.0.4",
     "nopt-usage": "^0.1.0",
