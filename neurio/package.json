@@ -4,12 +4,12 @@
   "description": "Import data from Neurio into Correl8.me",
   "main": "app.js",
   "dependencies": {
-    "correl8": "^0.0.3",
+    "correl8": "^0.0.5",
     "express": "^4.13.3",
-    "neurio": "^0.3.0",
+    "neurio": "^0.4.1",
     "nopt": "^3.0.4",
     "nopt-usage": "^0.1.0",
-    "prompt": "^0.2.14"
+    "prompt": "^1.0.0"
   },
   "devDependencies": {},
   "scripts": {
