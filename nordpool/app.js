@@ -83,7 +83,7 @@ function importData() {
     }
     else if (response && response.hits && response.hits.hits && response.hits.hits[0] && response.hits.hits[0].fields && response.hits.hits[0].fields.timestamp) {
       firstDate = new Date(response.hits.hits[0].fields.timestamp);
-      console.log("Setting first time to " + firstDate.toISOString());
+      console.log("Setting first time to previous " + firstDate.toISOString());
     }
     else {
       console.warn("No previously indexed data, setting first time to today!");
