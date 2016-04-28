@@ -4,11 +4,10 @@
   "description": "Import data from Nordpool into Correl8.me",
   "main": "app.js",
   "dependencies": {
-    "correl8": "^0.0.5",
+    "correl8": "^0.0.6",
     "nopt": "^3.0.4",
     "nopt-usage": "^0.1.0",
-    "nordpool": "^1.0.0",
-    "request": "^2.71.0"
+    "nordpool": "^1.0.0"
   },
   "devDependencies": {},
   "scripts": {
