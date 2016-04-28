@@ -1,4 +1,3 @@
-var request = require("request");
 var correl8 = require('correl8');
 var nopt = require('nopt');
 var nordpool = require('nordpool');
@@ -80,30 +79,29 @@ function importData() {
     size: 1,
     sort: [{'timestamp': 'desc'}],
   }).then(function(response) {
-    if (firstDate) {
-      console.log("Setting first time to " + firstDate);
-    }
-    else if (response && response.hits && response.hits.hits && response.hits.hits[0] && response.hits.hits[0].fields && response.hits.hits[0].fields.timestamp) {
-      firstDate = new Date(response.hits.hits[0].fields.timestamp);
-      console.log("Setting first time to " + firstDate.toISOString());
-    }
-    else {
-      console.warn("No previously indexed data, setting first time to today!");
-      firstDate = new Date();
-    }
-    var url = apiUrl + '&startDate=' + fmtDate(firstDate);
     if (lastDate) {
       if (typeof(lastDate) != 'Date') {
         lastDate = new Date(lastDate);
       }
-      if (lastDate.getTime() > firstDate.getTime() + (MAX_DAYS * MS_IN_DAY)) {
-        lastDate.setTime(firstDate.getTime() + (MAX_DAYS * MS_IN_DAY));
-      }
+    }
+    else if (response && response.hits && response.hits.hits && response.hits.hits[0] && response.hits.hits[0].fields && response.hits.hits[0].fields.timestamp) {
+      lastDate = new Date(response.hits.hits[0].fields.timestamp);
+      console.log("Setting lastDate to " + lastDate.toISOString());
     }
     else {
-      lastDate = new Date(firstDate.getTime() + (MAX_DAYS * MS_IN_DAY));
+      console.warn("No previously indexed data, setting lastDate to today!");
+      console.log(response.hits.hits[0].fields)
+      lastDate = new Date();
     }
-    prices.weekly({date: lastDate}, function(error, data) {
+    var opts = {endDate: lastDate};
+    if (firstDate) {
+      if (typeof(firstDate) != 'Date') {
+        firstDate = new Date(firstDate);
+      }
+      console.log("Setting first time to " + firstDate);
+      opts.firstDate = firstDate;
+    }
+    prices.hourly(opts, function(error, data) {
       if (error || !data) {
         console.warn('Error getting data: ' + JSON.stringify(error));
       }
@@ -113,7 +111,7 @@ function importData() {
         for (var i=0; i<data.length; i++) {
           var row = data[i];
           var id = 'price-hourly-' + row.date + '-' + row.area;
-          var values = {timestamp: row.date, price: row.value};
+          var values = {timestamp: row.date.format(), price: row.value};
           bulk.push({index: {_index: c8._index, _type: c8._type, _id: id}});
           bulk.push(values);
           // console.log(id + ': ' + row.value);
