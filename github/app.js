@@ -183,15 +183,15 @@ function importData() {
         // secret: clientSecret
       });
       c8.search({
-        fields: ['timestamp'],
+        _source: ['timestamp'],
         size: 1,
         sort: [{'timestamp': 'desc'}],
       }).then(function(response) {
         if (firstDate) {
           console.log('Setting first time to ' + firstDate);
         }
-        else if (response && response.hits && response.hits.hits && response.hits.hits[0] && response.hits.hits[0].fields && response.hits.hits[0].fields.timestamp) {
-          var d = new Date(response.hits.hits[0].fields.timestamp);
+        else if (response && response.hits && response.hits.hits && response.hits.hits[0] && response.hits.hits[0]._source && response.hits.hits[0]._source.timestamp) {
+          var d = new Date(response.hits.hits[0]._source.timestamp);
           firstDate = new Date(d.getTime() + 1);
           // firstDate = d;
           console.log('Setting first time to ' + firstDate);

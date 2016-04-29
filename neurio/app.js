@@ -56,7 +56,6 @@ var fields = {
   id: 'string'
 };
 
-/*
 var sampleFields = {
   timestamp: 'date',
   consumptionEnergy: 'long',
@@ -64,7 +63,6 @@ var sampleFields = {
   generationEnergy: 'long',
   generationPower: 'long'
 }
-*/
 
 var energyFields = {
   timestamp: 'date',
@@ -141,9 +139,9 @@ else if (options['authenticate']) {
 }
 else if (options['clear']) {
   c8.type(applianceType).clear().then(function() {
-    // return c8.type(sampleType).clear().then(function() {
+    return c8.type(sampleType).clear().then(function() {
       return c8.type(energyType).clear();
-    // });
+    });
   }).then(function(res) {
     console.log('Index cleared.');
     c8.release();
@@ -154,9 +152,9 @@ else if (options['clear']) {
 }
 else if (options['init']) {
   c8.type(applianceType).init(fields).then(function() {
-    // return c8.type(sampleType).init(fields).then(function() {
+    return c8.type(sampleType).init(sampleFields).then(function() {
       return c8.type(energyType).init(energyFields);
-    // });
+    });
   }).then(function() {
     console.log('Index initialized.');
   }).catch(function(error) {
@@ -178,15 +176,15 @@ function importData() {
         client.user().then(function(user) {
           if (user && user.locations && user.locations.length) {
             c8.type(energyType).search({
-              fields: ['timestamp'],
+              _source: ['timestamp'],
               size: 1,
               sort: [{'timestamp': 'desc'}],
             }).then(function(response) {
               if (firstDate) {
                 console.log('Setting first time to ' + firstDate);
               }
-              else if (response && response.hits && response.hits.hits && response.hits.hits[0] && response.hits.hits[0].fields && response.hits.hits[0].fields.timestamp) {
-                var d = new Date(response.hits.hits[0].fields.timestamp);
+              else if (response && response.hits && response.hits.hits && response.hits.hits[0] && response.hits.hits[0]._source && response.hits.hits[0]._source.timestamp) {
+                var d = new Date(response.hits.hits[0]._source.timestamp);
                 firstDate = new Date(d.getTime() + 1);
                 console.log('Setting first time to ' + firstDate);
               }
@@ -211,7 +209,7 @@ function importData() {
                 getAppliancePage(client, locId, firstDate, lastDate, MIN_POWER, EVENTS_PER_PAGE, 1);
                 for (var j=0; j<user.locations[i].sensors.length; j++) {
                   var sensorId = user.locations[i].sensors[j].id;
-                  // getSamplesHistoryPage(client, sensorId, firstDate, lastDate, GRANULARITY, FREQUENCY, EVENTS_PER_PAGE, 1);
+                  getSamplesHistoryPage(client, sensorId, firstDate, lastDate, GRANULARITY, FREQUENCY, EVENTS_PER_PAGE, 1);
                   getEnergyStats(client, sensorId, firstDate, lastDate, GRANULARITY, FREQUENCY);
                 }
               }
@@ -230,10 +228,10 @@ function importData() {
 }
 
 function getAppliancePage(client, locId, firstDate, lastDate, minPower, perPage, page) {
-  // client.applianceEvents(locId, firstDate, lastDate, minPower, perPage, page).then(function(events) {
-  client.applianceEventsRecent(locId, firstDate).then(function(events) {
+  client.applianceEvents(locId, firstDate, lastDate, minPower, perPage, page).then(function(events) {
+  // client.applianceEventsRecent(locId, firstDate).then(function(events) {
     // console.log(events);
-    if (!events || !events.length) {
+    if (!events || !events.length) {
       return;
     }
     var bulk = [];
@@ -241,7 +239,7 @@ function getAppliancePage(client, locId, firstDate, lastDate, minPower, perPage,
       var values = events[j];
       values.timestamp = new Date(values.start);
       values.duration = (new Date(values.end).getTime() - new Date(values.start).getTime())/1000;
-      var logStr = values.timestamp;
+      var logStr = values.timestamp.toISOString();
       if (values.appliance.label) {
         logStr += ' ' + values.appliance.label;
       }
@@ -251,7 +249,7 @@ function getAppliancePage(client, locId, firstDate, lastDate, minPower, perPage,
       bulk.push(values);
     }
     c8.type(applianceType).bulk(bulk).then(function(result) {
-      console.log('Indexed ' + result.items.length + ' documents in ' + result.took + ' ms.');
+      console.log('Indexed ' + result.items.length + ' appliance events in ' + result.took + ' ms.');
       bulk = null;
       if (events.length == perPage) {
         // page was full, request the next page (recursion!)
@@ -285,7 +283,7 @@ function getSamplesHistoryPage(client, sensorId, start, end, granularity, freque
       bulk.push(values);
     }
     c8.type(energyType).bulk(bulk).then(function(result) {
-      console.log('Indexed ' + result.items.length + ' documents in ' + result.took + ' ms.');
+      console.log('Indexed ' + result.items.length + ' power readings in ' + result.took + ' ms.');
       bulk = null;
       if (events.length == perPage) {
         // page was full, request the next page (recursion!)
@@ -316,14 +314,14 @@ function getEnergyStats(client, sensorId, start, end, granularity, frequency) {
       }
       // console.log(values);
       // console.log(consumption);
-      var logStr = values.timestamp + ' ' + consumption + ' Ws';
+      var logStr = values.timestamp.toISOString() + ' ' + consumption + ' Ws';
       console.log(logStr);
       var id = values.timestamp;
       bulk.push({index: {_index: c8.type(energyType)._index, _type: c8.type(energyType)._type, _id: id}});
       bulk.push(values);
     }
     c8.type(energyType).bulk(bulk).then(function(result) {
-      console.log('Indexed ' + result.items.length + ' documents in ' + result.took + ' ms.');
+      console.log('Indexed ' + result.items.length + ' energy stats in ' + result.took + ' ms.');
       bulk = null;
     }).catch(function(error) {
       console.trace(error);

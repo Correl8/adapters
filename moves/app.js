@@ -240,7 +240,7 @@ else {
         redirect_uri: conf.redirect_uri
       });
       c8.type(summaryType).search({
-        fields: ['timestamp'],
+        _source: ['timestamp'],
         size: 1,
         sort: [{'timestamp': 'desc'}],
       }).then(function(response) {
@@ -248,9 +248,9 @@ else {
           console.log('Setting first time to ' + firstDate);
           importData(firstDate, lastDate);
         }
-        else if (response && response.hits && response.hits.hits && response.hits.hits[0] && response.hits.hits[0].fields && response.hits.hits[0].fields.timestamp) {
-          console.log('Setting first time to ' + response.hits.hits[0].fields.timestamp);
-          firstDate = new Date(response.hits.hits[0].fields.timestamp);
+        else if (response && response.hits && response.hits.hits && response.hits.hits[0] && response.hits.hits[0]._source && response.hits.hits[0]._source.timestamp) {
+          console.log('Setting first time to ' + response.hits.hits[0]._source.timestamp);
+          firstDate = new Date(response.hits.hits[0]._source.timestamp);
           importData(firstDate, lastDate);
         }
         else {

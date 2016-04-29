@@ -5,18 +5,16 @@ var noptUsage = require('nopt-usage');
 
 var prices = new nordpool.Prices()
 
-var type = 'nordpool';
-var c8 = correl8(type);
-
-var MAX_DAYS = 7;
-var MS_IN_DAY = 24 * 60 * 60 * 1000;
+var priceType = 'nordpool-price';
+var c8 = correl8(priceType);
 
 // move to a separate module!
 var apiUrl = 'http://www.nordpoolspot.com/api/marketdata/page/35?currency=,EUR,EUR,EUR';
 
-var fields = {
+var priceFields = {
   timestamp: 'date',
-  price: 'float'
+  area: 'string',
+  value: 'float'
 };
 
 var knownOpts = {
@@ -62,7 +60,7 @@ else if (options['clear']) {
   });
 }
 else if (options['init']) {
-  c8.init(fields).then(function() {
+  c8.init(priceFields).then(function() {
     console.log('Index initialized.');
   }).catch(function(error) {
     console.trace(error);
@@ -75,7 +73,7 @@ else {
 
 function importData() {
   c8.search({
-    fields: ['timestamp'],
+    _source: ['timestamp'],
     size: 1,
     sort: [{'timestamp': 'desc'}],
   }).then(function(response) {
@@ -84,16 +82,17 @@ function importData() {
         lastDate = new Date(lastDate);
       }
     }
-    else if (response && response.hits && response.hits.hits && response.hits.hits[0] && response.hits.hits[0].fields && response.hits.hits[0].fields.timestamp) {
-      lastDate = new Date(response.hits.hits[0].fields.timestamp);
+    else if (response && response.hits && response.hits.hits && response.hits.hits[0] && response.hits.hits[0]._source && response.hits.hits[0]._source.timestamp) {
+      lastDate = new Date(response.hits.hits[0]._source.timestamp);
+      lastDate.setTime(lastDate.getTime() + 24 * 60 * 60 * 1000);
       console.log("Setting lastDate to " + lastDate.toISOString());
     }
     else {
       console.warn("No previously indexed data, setting lastDate to today!");
-      console.log(response.hits.hits[0].fields)
+      console.log(response.hits.hits[0])
       lastDate = new Date();
     }
-    var opts = {endDate: lastDate};
+    var opts = {area: 'FI', endDate: lastDate};
     if (firstDate) {
       if (typeof(firstDate) != 'Date') {
         firstDate = new Date(firstDate);
@@ -110,11 +109,12 @@ function importData() {
         var bulk = [];
         for (var i=0; i<data.length; i++) {
           var row = data[i];
-          var id = 'price-hourly-' + row.date + '-' + row.area;
-          var values = {timestamp: row.date.format(), price: row.value};
+          var ts = row.date.format();
+          var id = 'price-hourly-' + ts + '-' + row.area;
+          var values = {area: row.area, value: row.value, timestamp: ts};
           bulk.push({index: {_index: c8._index, _type: c8._type, _id: id}});
           bulk.push(values);
-          // console.log(id + ': ' + row.value);
+          console.log(id + ': ' + row.value);
         }
         c8.bulk(bulk).then(function(result) {
           console.log('Indexed ' + result.items.length + ' documents in ' + result.took + ' ms.');
@@ -125,25 +125,7 @@ function importData() {
         console.log(JSON.stringify(data.Rows, null, 2));
       }
     });
+  }).catch(function(error) {
+    console.err(error);
   });
-}
-
-function fmtDate(d) {
-  var date = d.getDate();
-  var month = d.getMonth() + 1;
-  var year = d.getFullYear();
-  if (date < 10) {
-    date = '0' + '' + date.toString();
-  }
-  if (month < 10) {
-    month = '0' + '' + month.toString();
-  }
-  return date + '-' + month + '-' + year;
-}
-
-function isValidDate(d) {
-  if (Object.prototype.toString.call(d) !== "[object Date]" ) {
-    return false;
-  }
-  return !isNaN(d.getTime());
 }
