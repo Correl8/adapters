@@ -1,5 +1,5 @@
 {
-  "name": "nordpool-import",
+  "name": "correl8-adapter-nordpool",
   "version": "1.0.0",
   "description": "Import data from Nordpool into Correl8.me",
   "main": "app.js",
