@@ -1,24 +1,15 @@
 {
-  "name": "gcal-import",
+  "name": "correl8-adapter-googlecalendar",
   "version": "1.0.0",
   "description": "Import data from Google Calendar into Correl8.me",
-  "main": "app.js",
+  "main": "index.js",
   "dependencies": {
-    "correl8": "^0.0.3",
-    "express": "^4.13.3",
     "google-auth-library": "^0.9.7",
-    "googleapis": "^2.1.7",
-    "moment": "^2.10.6",
-    "nopt": "^3.0.4",
-    "nopt-usage": "^0.1.0",
-    "path": "^0.12.7",
-    "prompt": "^0.2.14",
-    "request": "^2.65.0"
+    "googleapis": "^2.1.7"
   },
   "devDependencies": {},
   "scripts": {
-    "start": "node --harmony app.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node --harmony index.js"
   },
   "author": "Samuel Rinnetmäki <samuel@iki.fi>",
   "license": "ISC"
