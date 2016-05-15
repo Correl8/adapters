@@ -41,13 +41,16 @@ adapter.importData = function(c8, conf, opts) {
     size: 1,
     sort: [{'timestamp': 'desc'}],
   }).then(function(response) {
+    var resp = c8.trimResults(response);
+    var firstDate, lastDate;
     if (opts.firstDate) {
-      console.log("Setting first time by opts to " + opts.firstDate);
-      firstDate = opts.firstDate;
+      firstDate = new Date(opts.firstDate);
+      console.log('Setting first time to ' + firstDate);
     }
-    else if (response && response.hits && response.hits.hits && response.hits.hits[0] && response.hits.hits[0]._source && response.hits.hits[0]._source.timestamp) {
-      console.log("Setting first time to " + response.hits.hits[0]._source.timestamp);
-      firstDate = new Date(response.hits.hits[0]._source.timestamp);
+    else if (resp && resp.timestamp) {
+      var d = new Date(resp.timestamp);
+      firstDate = new Date(d.getTime() + 1);
+      console.log('Setting first time to ' + firstDate);
     }
     else {
       console.warn("No previously indexed data, setting first time to 0!");
