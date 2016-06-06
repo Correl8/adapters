@@ -9,7 +9,7 @@ var Moves = require('moves');
 var moves;
 
 var c8 = correl8('moves');
-var defaultPort = 3000;
+var defaultPort = 6543;
 var defaultUrl = 'http://localhost:' + defaultPort + '/';
 var MAX_DAYS = 50;
 var summaryIndex = 'moves-summary';
@@ -129,6 +129,40 @@ if (options['help']) {
   console.log(noptUsage(knownOpts, shortHands, description));
 }
 else if (options['authenticate']) {
+  var config = {};
+  prompt.message = '';
+  var promptProps = {
+    properties: {
+      client_id: {
+        description: 'Enter your Moves client ID'.magenta
+      },
+      client_secret: {
+        description: 'Enter your Moves client secret'.magenta
+      },
+      redirect_uri: {
+        description: 'Enter your redirect URL (' + defaultUrl+ ')'.magenta,
+        default: defaultUrl
+      },
+    }
+  }
+  prompt.get(promptProps, function (err, result) {
+    if (err) {
+      console.trace(err);
+    }
+    else {
+      config = result;
+      c8.config(config).then(function(){
+        console.log('Configuration stored.');
+      }).catch(function(error) {
+        console.trace(error);
+      });
+      moves = new Moves(config);
+      var auth_url = moves.authorize({
+        scope: ['activity', 'location']
+      });
+      console.log('Thanks! Now open ' + auth_url + ' in your browser!');
+    }
+  });
   var app = express();
   app.all('/', function (req, res) {
     if (req.query && req.query.code) {
@@ -167,41 +201,7 @@ else if (options['authenticate']) {
     var host = server.address().address;
     var port = server.address().port;
     // console.log('Temporary Moves auth server listening at http://%s:%s', host, port);
-  });
-  var config = {};
-  prompt.start();
-  prompt.message = '';
-  var promptProps = {
-    properties: {
-      client_id: {
-        description: 'Enter your Moves client ID'.magenta
-      },
-      client_secret: {
-        description: 'Enter your Moves client secret'.magenta
-      },
-      redirect_uri: {
-        description: 'Enter your redirect URL (' + defaultUrl+ ')'.magenta
-      },
-    }
-  }
-  prompt.get(promptProps, function (err, result) {
-    if (err) {
-      console.trace(err);
-    }
-    else {
-      config = result;
-      console.log(config);
-      c8.config(config).then(function(){
-        console.log('Configuration stored.');
-      }).catch(function(error) {
-        console.trace(error);
-      });
-      moves = new Moves(config);
-      var auth_url = moves.authorize({
-        scope: ['activity', 'location']
-      });
-      console.log('Thanks! Now open ' + auth_url + ' in your browser!');
-    }
+    prompt.start();
   });
 }
 else if (options['clear']) {
@@ -260,13 +260,14 @@ else {
               return;
             }
             else if (response.body === 'expired_access_token') {
-              refreshToken(conf);
+              refreshToken(refreshToken(function() {importData(firstDate, lastDate);}));
+              return;
             }
             else {
               var rb = JSON.parse(response.body);
               if (!rb || rb.error) {
                 console.trace(rb.error);
-                refreshToken(conf);
+                refreshToken();
                 return;
               }
               else {
@@ -339,7 +340,9 @@ function importData(firstDate, lastDate) {
       else {
         var rb = JSON.parse(response.body);
         if (!rb || rb.error) {
-          refreshToken(getHistory);
+          // refreshToken(function() {importData(firstDate, lastDate);});
+          console.error('No request body!');
+          console.log(response);
         }
         else {
           var document = JSON.parse(body)[0];
@@ -367,26 +370,34 @@ function importData(firstDate, lastDate) {
 
 function refreshToken(next) {
   console.log('Refreshing token...');
-  moves.refresh_token(refresh_token, function(error, response, body) {
-    if (error) {
-      console.warn('Refresh got error: ' + error);
-      return;
+  c8.config().then(function(result) {
+    if (result.hits && result.hits.hits && result.hits.hits[0] && result.hits.hits[0]._source['client_id']) {
+      var config = new Moves(result.hits.hits[0]._source);
+      // console.log(config.config);
+      moves.refresh_token(config.config.refresh_token, function(error, response, body) {
+        if (error) {
+          console.warn('Refresh got error: ' + error);
+          return;
+        }
+        // console.log(body); // should store!
+        var rb = JSON.parse(response.body);
+        // console.log(rb);
+        if (!rb || rb.error) {
+          if (rb.error === 'invalid_grant') {
+            console.trace(rb.error);
+            // getToken(next);
+          }
+          console.trace(rb.error);
+          // reauthorize();
+        }
+        else {
+          console.log('Token refreshed. Try again!');
+          // next(); // possible infinite loop!
+        }
+      });
     }
-    // console.log(body); // should store!
-    var rb = JSON.parse(response.body);
-    // console.log(rb);
-    if (!rb || rb.error) {
-      if (rb.error === 'invalid_grant') {
-        console.trace(rb.error);
-        // getToken(next);
-      }
-      console.trace(rb.error);
-      // reauthorize();
-    }
-    else {
-      console.log('Token refreshed. Try again!')
-      // next(); // possible infinite loop!
-    }
+  }).catch(function(error) {
+    console.error(error);
   });
 }
 
