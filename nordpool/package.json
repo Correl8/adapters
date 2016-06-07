@@ -2,17 +2,13 @@
   "name": "correl8-adapter-nordpool",
   "version": "1.0.0",
   "description": "Import data from Nordpool into Correl8.me",
-  "main": "app.js",
+  "main": "index.js",
   "dependencies": {
-    "correl8": "^0.0.6",
-    "nopt": "^3.0.4",
-    "nopt-usage": "^0.1.0",
     "nordpool": "^1.0.0"
   },
   "devDependencies": {},
   "scripts": {
-    "start": "node --harmony app.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node --harmony index.js"
   },
   "author": "Samuel Rinnetmäki <samuel@iki.fi>",
   "license": "ISC"
