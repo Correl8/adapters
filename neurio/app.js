@@ -58,6 +58,7 @@ var fields = {
 
 var sampleFields = {
   timestamp: 'date',
+  cumulativeConsumptionEnergy: 'long',
   consumptionEnergy: 'long',
   consumptionPower: 'long',
   generationEnergy: 'long',
@@ -167,7 +168,6 @@ else {
 }
 
 function importData() {
-
   c8.config().then(function(res) {
     if (res.hits && res.hits.hits && res.hits.hits[0] && res.hits.hits[0]._source['clientId']) {
       conf = res.hits.hits[0]._source;
@@ -224,6 +224,11 @@ function importData() {
         console.trace(error);
       });
     }
+    else {
+      console.log('Configure first!');
+    }
+  }).catch(function(error) {
+    console.log('Configure first!');
   });
 }
 
@@ -270,8 +275,17 @@ function getAppliancePage(client, locId, firstDate, lastDate, minPower, perPage,
 function getSamplesHistoryPage(client, sensorId, start, end, granularity, frequency, perPage, page) {
   client.historySamples(sensorId, start, end, granularity, frequency, perPage, page).then(function (events) {
     var bulk = [];
+    var lastConsumptionEnery; // store and fetch?
     for (var i=0; i<events.length; i++) {
       var values = events[i];
+      if (!lastConsumptionEnery) {
+        lastConsumptionEnery = values.consumptionEnergy;
+        continue; // will lose some power readings?
+        values.cumulativeConsumptionEnergy = null;
+        values.consumptionEnergy = null;
+      }
+      values.cumulativeConsumptionEnergy = values.consumptionEnergy;
+      values.consumptionEnergy = values.consumptionEnergy - lastConsumptionEnery;
       var power = values.consumptionPower || 0;
       if (values.generationPower) {
         power -= values.generationPower;
@@ -281,6 +295,7 @@ function getSamplesHistoryPage(client, sensorId, start, end, granularity, freque
       var id = values.timestamp;
       bulk.push({index: {_index: c8.type(sampleType)._index, _type: c8.type(sampleType)._type, _id: id}});
       bulk.push(values);
+      // console.log(values);
     }
     c8.type(energyType).bulk(bulk).then(function(result) {
       console.log('Indexed ' + result.items.length + ' power readings in ' + result.took + ' ms.');
