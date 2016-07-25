@@ -280,17 +280,23 @@ function getSamplesHistoryPage(client, sensorId, start, end, granularity, freque
       var values = events[i];
       if (!lastConsumptionEnery) {
         lastConsumptionEnery = values.consumptionEnergy;
+        // console.log(values.timestamp + ' - skipping');
         continue; // will lose some power readings?
         values.cumulativeConsumptionEnergy = null;
         values.consumptionEnergy = null;
       }
       values.cumulativeConsumptionEnergy = values.consumptionEnergy;
       values.consumptionEnergy = values.consumptionEnergy - lastConsumptionEnery;
+      lastConsumptionEnery = values.cumulativeConsumptionEnergy;
       var power = values.consumptionPower || 0;
       if (values.generationPower) {
         power -= values.generationPower;
       }
-      var logStr = values.timestamp + ' ' + power + ' W';
+      var energy = values.consumptionEnergy || 0;
+      if (values.generationEnergy) {
+        power -= values.generationEnergy;
+      }
+      var logStr = values.timestamp + ' ' + power + ' W, ' + energy + ' Ws';
       console.log(logStr);
       var id = values.timestamp;
       bulk.push({index: {_index: c8.type(sampleType)._index, _type: c8.type(sampleType)._type, _id: id}});
