@@ -17,6 +17,7 @@ var MIN_POWER = 400;
 // maximum granularity is 5 minutes
 var GRANULARITY = 'minutes';
 var FREQUENCY = 5;
+var lastConsumptionEnery;
 
 var fields = {
   appliance: {
@@ -185,6 +186,7 @@ function importData() {
               }
               else if (response && response.hits && response.hits.hits && response.hits.hits[0] && response.hits.hits[0]._source && response.hits.hits[0]._source.timestamp) {
                 var d = new Date(response.hits.hits[0]._source.timestamp);
+                lastConsumptionEnery = response.hits.hits[0]._source.cumulativeConsumptionEnergy;
                 firstDate = new Date(d.getTime() + 1);
                 console.log('Setting first time to ' + firstDate);
               }
@@ -275,7 +277,6 @@ function getAppliancePage(client, locId, firstDate, lastDate, minPower, perPage,
 function getSamplesHistoryPage(client, sensorId, start, end, granularity, frequency, perPage, page) {
   client.historySamples(sensorId, start, end, granularity, frequency, perPage, page).then(function (events) {
     var bulk = [];
-    var lastConsumptionEnery; // store and fetch?
     for (var i=0; i<events.length; i++) {
       var values = events[i];
       if (!lastConsumptionEnery) {
