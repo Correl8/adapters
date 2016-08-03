@@ -17,6 +17,7 @@ var MIN_POWER = 400;
 // maximum granularity is 5 minutes
 var GRANULARITY = 'minutes';
 var FREQUENCY = 5;
+var lastConsumptionEnery;
 
 var fields = {
   appliance: {
@@ -58,6 +59,7 @@ var fields = {
 
 var sampleFields = {
   timestamp: 'date',
+  cumulativeConsumptionEnergy: 'long',
   consumptionEnergy: 'long',
   consumptionPower: 'long',
   generationEnergy: 'long',
@@ -167,7 +169,6 @@ else {
 }
 
 function importData() {
-
   c8.config().then(function(res) {
     if (res.hits && res.hits.hits && res.hits.hits[0] && res.hits.hits[0]._source['clientId']) {
       conf = res.hits.hits[0]._source;
@@ -185,6 +186,7 @@ function importData() {
               }
               else if (response && response.hits && response.hits.hits && response.hits.hits[0] && response.hits.hits[0]._source && response.hits.hits[0]._source.timestamp) {
                 var d = new Date(response.hits.hits[0]._source.timestamp);
+                lastConsumptionEnery = response.hits.hits[0]._source.cumulativeConsumptionEnergy;
                 firstDate = new Date(d.getTime() + 1);
                 console.log('Setting first time to ' + firstDate);
               }
@@ -224,6 +226,11 @@ function importData() {
         console.trace(error);
       });
     }
+    else {
+      console.log('Configure first!');
+    }
+  }).catch(function(error) {
+    console.log('Configure first!');
   });
 }
 
@@ -272,15 +279,30 @@ function getSamplesHistoryPage(client, sensorId, start, end, granularity, freque
     var bulk = [];
     for (var i=0; i<events.length; i++) {
       var values = events[i];
+      if (!lastConsumptionEnery) {
+        lastConsumptionEnery = values.consumptionEnergy;
+        // console.log(values.timestamp + ' - skipping');
+        continue; // will lose some power readings?
+        values.cumulativeConsumptionEnergy = null;
+        values.consumptionEnergy = null;
+      }
+      values.cumulativeConsumptionEnergy = values.consumptionEnergy;
+      values.consumptionEnergy = values.consumptionEnergy - lastConsumptionEnery;
+      lastConsumptionEnery = values.cumulativeConsumptionEnergy;
       var power = values.consumptionPower || 0;
       if (values.generationPower) {
         power -= values.generationPower;
       }
-      var logStr = values.timestamp + ' ' + power + ' W';
+      var energy = values.consumptionEnergy || 0;
+      if (values.generationEnergy) {
+        power -= values.generationEnergy;
+      }
+      var logStr = values.timestamp + ' ' + power + ' W, ' + energy + ' Ws';
       console.log(logStr);
       var id = values.timestamp;
       bulk.push({index: {_index: c8.type(sampleType)._index, _type: c8.type(sampleType)._type, _id: id}});
       bulk.push(values);
+      // console.log(values);
     }
     c8.type(energyType).bulk(bulk).then(function(result) {
       console.log('Indexed ' + result.items.length + ' power readings in ' + result.took + ' ms.');

@@ -4,7 +4,7 @@
   "description": "Import data from Neurio into Correl8.me",
   "main": "app.js",
   "dependencies": {
-    "correl8": "^0.0.5",
+    "correl8": "^0.0.7",
     "express": "^4.13.3",
     "neurio": "^0.4.1",
     "nopt": "^3.0.4",
