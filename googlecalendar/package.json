@@ -4,8 +4,10 @@
   "description": "Import data from Google Calendar into Correl8.me",
   "main": "index.js",
   "dependencies": {
+    "fs": "0.0.2",
     "google-auth-library": "^0.9.7",
-    "googleapis": "^2.1.7"
+    "googleapis": "^2.1.7",
+    "prompt": "^1.0.0"
   },
   "devDependencies": {},
   "scripts": {
