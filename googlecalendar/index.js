@@ -1,12 +1,12 @@
+var fs = require('fs');
 var google = require('googleapis');
 var googleAuth = require('google-auth-library');
+var prompt = require('prompt');
 
 var adapter = {};
 
-var eventType = 'gcal-event';
-var c8 = correl8(eventType);
 var MS_IN_DAY = 24 * 60 * 60 * 1000;
-var MAX_DAYS = 10;
+var MAX_DAYS = 1000;
 var MAX_EVENTS = 100;
 var SCOPES = ['https://www.googleapis.com/auth/calendar.readonly'];
 
@@ -18,6 +18,7 @@ adapter.types = [
     fields: {
       "timestamp": "date",
       "calendar": "string",
+      "calendarId": "string",
       "duration": "integer",
       "kind": "string",
       "etag": "string",
@@ -117,7 +118,7 @@ adapter.types = [
 
 adapter.promptProps = {
   properties: {
-    code: {
+    authconfig: {
       description: 'Configuration file'.magenta,
       default: 'client_secret.json'
     },
@@ -125,134 +126,176 @@ adapter.promptProps = {
 };
 
 adapter.storeConfig = function(c8, result) {
-  var config = {
-    user: result.user,
-    clientId: CLIENT_ID,
-    clientSecret: CLIENT_SECRET
-  };
-  var authOpts = {
-    scopes: SCOPES,
-    note: API_NOTE,
-    note_url: API_NOTE_URL,
-  };
-  if (result.otp) {
-    authOpts.headers = {"X-GitHub-OTP": result.otp};
-  }
-  github.authenticate({
-    type: "basic",
-    username: result.user,
-    password: result.password
-  });
-  console.log(c8.config);
-  console.log(result);
-  github.authorization.create(authOpts, function(err, res) {
+  var conf = {};
+  fs.readFile(result['authconfig'], function (err, content) {
     if (err) {
-      console.trace(err);
+      console.log('Error loading client secret file: ' + err);
+      return;
     }
-    else if (res.token) {
-      config.token = res.token;
-      // console.log(config);
-      return c8.config(config).then(function(){
-        console.log('Configuration stored.');
-      }).catch(function(error) {
-        console.trace(error);
-      });
-    }
-    else {
-      console.error('Authorization failed');
-      console.trace(res);
-    }
-  });
-}
-
-adapter.importData = function(c8, conf, opts) {
-  github.authenticate({
-    type: "oauth",
-    token: conf.token,
-  });
-  return c8.search({
-    _source: ['timestamp'],
-    size: 1,
-    sort: [{'timestamp': 'desc'}],
-  }).then(function(response) {
-    var resp = c8.trimResults(response);
-    var firstDate, lastDate;
-    if (opts.firstDate) {
-      firstDate = new Date(opts.firstDate);
-      console.log('Setting first time to ' + firstDate);
-    }
-    else if (resp && resp.timestamp) {
-      var d = new Date(resp.timestamp);
-      firstDate = new Date(d.getTime() + 1);
-      console.log('Setting first time to ' + firstDate);
-    }
-    else {
-      firstDate = new Date();
-      firstDate.setTime(firstDate.getTime() - MS_IN_DAY);
-      console.warn('No previously indexed data, setting first time to ' + firstDate);
-    }
-    if (opts.lastDate) {
-      lastDate = new Date(opts.lastDate);
-    }
-    else {
-      lastDate = new Date();
-    }
-    if (lastDate.getTime() >= (firstDate.getTime() + (MS_IN_DAY * MAX_DAYS))) {
-      lastDate.setTime(firstDate.getTime() + (MS_IN_DAY * MAX_DAYS) - 1);
-      console.warn('Max time range ' + MAX_DAYS + ' days, setting end time to ' + lastDate);
-    }
-    github.repos.getAll({per_page: 100}, function(err, res) {
-      if (err) {
-        console.error(err);
-        return;
+    conf = JSON.parse(content);
+    // console.log(conf);
+    var auth = new googleAuth();
+    var clientSecret = conf.installed.client_secret;
+    var clientId = conf.installed.client_id;
+    var redirectUrl = conf.installed.redirect_uris[0];
+    var oauth2Client = new auth.OAuth2(clientId, clientSecret, redirectUrl);
+    var authUrl = oauth2Client.generateAuthUrl({
+      access_type: 'offline',
+      scope: SCOPES
+    });
+    console.log('Authorize this app by visiting this url\n', authUrl, '\n\n');
+    prompt.start();
+    prompt.message = '';
+    var promptProps = {
+      properties: {
+        code: {
+          description: 'Enter the code shown on page'.magenta
+        },
       }
-      for (var i=0; i<res.length; i++) {
-        var repo = res[i];
-        // console.log(JSON.stringify(repo));
-        var msg = {
-          user: repo.owner.login,
-          repo: repo.name,
-          author: conf.user,
-          since: firstDate.toISOString(),
-          until: lastDate.toISOString(),
-          per_page: 100
-        };
-        // console.log(msg);
-        github.repos.getCommits(msg, function(err, subres) {
+    }
+    prompt.get(promptProps, function (err, result) {
+      if (err) {
+        console.trace(err);
+      }
+      else {
+        oauth2Client.getToken(result.code, function(err, token) {
           if (err) {
-            // don't bother with "not found" and "repo empty" messages
-            if ((err.code != 404) && (err.code != 409)) {
-              console.error(err.code + ': ' + err.message);
-            }
+            console.log('Error while trying to retrieve access token', err);
             return;
           }
-          // console.log(JSON.stringify(subres[0], null, 2));
-          // console.log(subres.length);
-          var bulk = [];
-          for (var j=0; j<subres.length; j++) {
-            var commit = subres[j];
-            var match;
-            if (match = commit.url.match(/github\.com\/repos\/(.*?)\/commits/)) {
-              var repo = match[1].split('/');
-            }
-            commit.timestamp = commit.commit.author.date;
-            bulk.push({index: {_index: c8._index, _type: c8._type, _id: commit.sha}});
-            bulk.push(commit);
-          }
-          // console.log(JSON.stringify(bulk, null, 2));
-          if (bulk.length > 0) {
-            return c8.bulk(bulk).then(function(result) {
-              console.log('Indexed ' + result.items.length + ' commits in ' + result.took + ' ms.');
-              bulk = null;
-            }).catch(function(error) {
-              console.trace(error);
-              bulk = null;
-            });
-          }
+          conf.credentials = token;
+          // console.log(conf);
+
+          c8.config(conf).then(function(){
+            console.log('Access credentials saved.');
+            c8.release();
+            process.exit;
+          });
         });
       }
     });
   });
 }
+
+adapter.importData = function(c8, conf, opts) {
+  var clientSecret = conf.installed.client_secret;
+  var clientId = conf.installed.client_id;
+  var redirectUrl = conf.installed.redirect_uris[0];
+  var auth = new googleAuth();
+  var oauth2Client = new auth.OAuth2(clientId, clientSecret, redirectUrl);
+  oauth2Client.credentials = conf.credentials;
+  var calendar = google.calendar('v3');
+  calendar.calendarList.list({auth: oauth2Client}, function(err, resp) {
+    if (err) {
+      console.log('The calendar API returned an error when reading calendars: ' + err);
+      return;
+    }
+    var params = [];
+    var calendars = [];
+    for (var i=0; i<resp.items.length; i++) {
+      var calId = resp.items[i].id;
+      calendars[i] = calId;
+      // console.log(calId);
+      params[i] = {
+        _source: ['timestamp', 'calendar', 'calendarId', 'summary'],
+        query: {
+          match: {
+            calendarId: calId
+          }
+        },
+        size: 1,
+        sort: [{'timestamp': 'desc'}],
+      };
+    }
+    c8.msearch(params).then(function(response) {
+      if (!response || !response.responses) {
+        return;
+      }
+      // console.log(response);
+      for (var i=0; i<response.responses.length; i++) {
+        let calId = calendars[i];
+        var res = response.responses[i];
+        var firstDate, lastDate;
+        if (opts.firstDate) {
+          firstDate = opts.firstDate;
+          console.log('Setting first time for ' + calId + ' to ' + firstDate);
+        }
+        else if (res.hits.hits && res.hits.hits[0] && res.hits.hits[0]._source.timestamp) {
+          // console.log(res.hits.hits[0]._source);
+          var d = new Date(res.hits.hits[0]._source.timestamp);
+          firstDate = new Date(d.getTime() + 1);
+          console.log('Setting first time for ' + calId + '  to ' + firstDate);
+        }
+        else {
+          firstDate = new Date();
+          firstDate.setTime(firstDate.getTime() - MS_IN_DAY);
+          console.warn('No previously indexed data, setting first time for ' + calId + '  to ' + firstDate);
+        }
+        lastDate = opts.lastDate || new Date();
+        if (lastDate.getTime() >= (firstDate.getTime() + (MS_IN_DAY * MAX_DAYS))) {
+          lastDate.setTime(firstDate.getTime() + (MS_IN_DAY * MAX_DAYS) - 1);
+          console.warn('Max time range ' + MAX_DAYS + ' days, setting end time for ' + calId + '  to ' + lastDate);
+        }
+        oauth2Client.credentials = conf.credentials;
+        var searchOpts = {
+          auth: oauth2Client,
+          calendarId: calId,
+          timeMin: firstDate.toISOString(),
+          timeMax: lastDate.toISOString(),
+          maxResults: MAX_EVENTS,
+          singleEvents: true,
+          orderBy: 'startTime'
+        };
+        // console.log('Reading calendar ' + calId);
+        // console.log(searchOpts);
+        calendar.events.list(searchOpts, function(error, response) {
+          // console.log(response);
+          if (error) {
+            // console.log(error);
+            if (error == 'Error: Not Found') {
+              // console.log(cal + ': no events found between '+ firstDate + ' and ' + lastDate + '.');
+              // silently ignore
+              return;
+            }
+            console.log('The calendar API returned an error when reading events: ' + error);
+            return;
+          }
+          // console.log(response);
+          var cal = response.summary;
+          var events = response.items;
+          if (!events || events.length === 0) {
+            console.log(cal + ': no events found between '+ firstDate + ' and ' + lastDate + '.');
+            return;
+          }
+          console.log(cal + ': found ' + events.length + ' events:');
+          var bulk = [];
+          for (var j=0; j<events.length; j++) {
+            var event = events[j];
+            var start = new Date(event.start.dateTime || event.start.date);
+            var end = new Date(event.end.dateTime || event.end.date);
+            event.calendar = cal;
+            event.calendarId = calId;
+            event.timestamp = start;
+            event.duration = (end.getTime() - start.getTime())/1000;
+            console.log('%s %d: %s - %s (%d s)', cal, j+1, start, event.summary, event.duration);
+            bulk.push({index: {_index: c8._index, _type: c8._type, _id: event.id}});
+            bulk.push(event);
+          }
+          // console.log(bulk);
+          c8.bulk(bulk).then(function(result) {
+            console.log('Indexed ' + result.items.length + ' events in ' + result.took + ' ms.');
+            bulk = null;
+          }).catch(function(error) {
+            console.trace(error);
+            bulk = null;
+          });
+        });
+      }
+    }).catch(function(error) {
+      console.trace(error);
+      bulk = null;
+    });
+  });
+};
 
 module.exports = adapter;
