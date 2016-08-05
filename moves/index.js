@@ -1,5 +1,6 @@
 var Moves = require('moves');
 var dates = require('moves-date');
+var express = require('express');
 var moves;
 
 var defaultPort = 3000;
@@ -8,10 +9,7 @@ var MAX_DAYS = 50;
 
 var adapter = {};
 
-var eventType = 'moves-summary';
-var c8 = correl8(eventType);
-
-adapter.sensorName = 'googlecalendar-event';
+adapter.sensorName = 'moves';
 
 var summaryIndex = 'moves-summary';
 var summaryType = 'moves-summary';
@@ -113,17 +111,28 @@ adapter.promptProps = {
       description: 'Enter your Moves client secret'.magenta
     },
     redirect_uri: {
-      description: 'Enter your redirect URL (' + defaultUrl+ ')'.magenta,
+      description: 'Enter your redirect URL'.magenta,
       default: defaultUrl
     },
   }
 };
 
 adapter.storeConfig = function(c8, result) {
+  var conf = result;
   var app = express();
+  var server = app.listen(defaultPort, function () {
+    var host = server.address().address;
+    var port = server.address().port;
+    // console.log('Temporary Moves auth server listening at http://%s:%s', host, port);
+  });
+  moves = new Moves(result);
+  var auth_url = moves.authorize({
+    scope: ['activity', 'location']
+  });
+  console.log('Authorize the app by opening the followin url in your browser:\n ' + auth_url);
   app.all('/', function (req, res) {
     if (req.query && req.query.code) {
-      moves = new Moves(result);
+      // moves = new Moves(result);
       moves.token(req.query.code, function(error, response, body) {
         if (error) {
           console.trace(error);
@@ -132,8 +141,13 @@ adapter.storeConfig = function(c8, result) {
         }
         var rb = JSON.parse(response.body);
         if (rb) {
-          return c8.config(rb).then(function(){
+          Object.assign(conf, rb);
+          server.close();
+          return c8.config(conf).then(function(){
+            res.send('Access token saved.');
             console.log('Configuration stored.');
+            c8.release();
+            process.exit();
           }).catch(function(error) {
             console.trace(error);
           });
@@ -147,11 +161,6 @@ adapter.storeConfig = function(c8, result) {
     else {
       res.send('Waiting for code in query string...');
     }
-  });
-  var server = app.listen(defaultPort, function () {
-    var host = server.address().address;
-    var port = server.address().port;
-    // console.log('Temporary Moves auth server listening at http://%s:%s', host, port);
   });
 }
 
