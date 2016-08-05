@@ -197,7 +197,7 @@ adapter.importData = function(c8, conf, opts) {
       calendars[i] = calId;
       // console.log(calId);
       params[i] = {
-        _source: ['timestamp', 'calendar', 'calendarId', 'summary'],
+        _source: ['timestamp', 'calendarId'],
         query: {
           match: {
             calendarId: calId
