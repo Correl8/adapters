@@ -37,13 +37,13 @@ adapter.promptProps = {
 };
 
 adapter.storeConfig = function(c8, result) {
-  var conf = resutl;
+  var conf = result;
   fs.readFile(result.authconfig, function (err, content) {
     if (err) {
       console.log('Error loading client secret file: ' + err);
       return;
     }
-    conf.concat(JSON.parse(content));
+    Object.assign(conf, JSON.parse(content));
     // console.log(conf);
     var auth = new googleAuth();
     var clientSecret = conf.installed.client_secret;
@@ -75,7 +75,6 @@ adapter.storeConfig = function(c8, result) {
             return;
           }
           conf.credentials = token;
-          console.log(conf);
 
           c8.config(conf).then(function(){
             console.log('Access credentials saved.');
