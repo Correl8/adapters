@@ -4,6 +4,7 @@
   "description": "Import data from Moves app into Correl8.me",
   "main": "index.js",
   "dependencies": {
+    "express": "^4.14.0",
     "moves": "^0.0.2",
     "moves-date": "^0.1.2"
   },
