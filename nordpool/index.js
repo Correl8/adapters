@@ -1,15 +1,20 @@
 var nordpool = require("nordpool");
 var prices = new nordpool.Prices()
 
+var MS_IN_DAY = 24 * 60 * 60 * 1000;
+
 var adapter = {};
 
 adapter.sensorName = 'nordpool-price';
 
 adapter.types = [
   {
-    timestamp: 'date',
-    area: 'string',
-    value: 'float'
+    name: 'nordpool-price',
+    fields: {
+      timestamp: 'date',
+      area: 'string',
+      value: 'float'
+    }
   }
 ];
 
@@ -49,9 +54,17 @@ adapter.importData = function(c8, conf, opts) {
         console.log("Setting lastDate to " + lastDate.toISOString());
       }
     }
+    else if (opts.firstDate) {
+      firstDate = opts.firstDate;
+      if (typeof(firstDate) != 'Date') {
+        firstDate = new Date(firstDate);
+        console.log("Setting firstDate to " + firstDate.toISOString());
+        lastDate = new Date(firstDate.getTime() + MS_IN_DAY);
+      }
+    }
     else if (resp && resp.timestamp) {
       lastDate = new Date(resp.timestamp);
-      lastDate.setTime(lastDate.getTime() + 24 * 60 * 60 * 1000);
+      lastDate.setTime(lastDate.getTime() + MS_IN_DAY);
       console.log("Setting lastDate to " + lastDate.toISOString());
     }
     else {
@@ -60,12 +73,7 @@ adapter.importData = function(c8, conf, opts) {
       lastDate = new Date();
     }
     var params = {area: conf.area, currency: conf.currency, endDate: lastDate};
-    if (opts.firstDate) {
-      firstDate = opts.firstDate;
-      if (typeof(firstDate) != 'Date') {
-        firstDate = new Date(firstDate);
-      }
-      console.log("Setting first time to " + firstDate);
+    if (firstDate) {
       params.firstDate = firstDate;
     }
     prices.hourly(params, function(error, data) {
@@ -94,7 +102,7 @@ adapter.importData = function(c8, conf, opts) {
       }
     });
   }).catch(function(error) {
-    console.err(error);
+    console.error(error);
   });
 }
 module.exports = adapter;
