@@ -1,20 +1,15 @@
 {
-  "name": "neurio-import",
+  "name": "correl8-adapter-neurio",
   "version": "1.0.0",
   "description": "Import data from Neurio into Correl8.me",
   "main": "app.js",
   "dependencies": {
-    "correl8": "^0.0.7",
-    "express": "^4.13.3",
-    "neurio": "^0.4.1",
-    "nopt": "^3.0.4",
-    "nopt-usage": "^0.1.0",
-    "prompt": "^1.0.0"
+    "correl8-cli": "^0.1.0",
+    "neurio": "^0.4.1"
   },
   "devDependencies": {},
   "scripts": {
-    "start": "node --harmony app.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node --harmony node_modules/correl8-cli/app.js -a ../../index.js"
   },
   "author": "Samuel Rinnetmäki <samuel@iki.fi>",
   "license": "ISC"
