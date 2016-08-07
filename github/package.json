@@ -9,7 +9,7 @@
     "passwoid": "^4.0.3"
   },
   "scripts": {
-    "start": "node --harmony node_modules/correl8-cli/app.js -a ../../index.js"
+    "start": "node node_modules/correl8-cli/app.js -a ../../index.js"
   },
   "author": "Samuel Rinnetmäki <samuel@iki.fi>",
   "license": "ISC"
