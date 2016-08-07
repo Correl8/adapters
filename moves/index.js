@@ -6,6 +6,7 @@ var moves;
 var defaultPort = 3000;
 var defaultUrl = 'http://localhost:' + defaultPort + '/';
 var MAX_DAYS = 50;
+var MS_IN_DAY = 24 * 60 * 60 * 1000;
 
 var adapter = {};
 
@@ -172,21 +173,22 @@ adapter.importData = function(c8, conf, opts) {
     sort: [{'timestamp': 'desc'}],
   }).then(function(response) {
     console.log('Getting first date...');
-    var firstDate, lastDate;
     return c8.search({
       _source: ['timestamp'],
       size: 1,
       sort: [{'timestamp': 'desc'}],
     }).then(function(response) {
       var resp = c8.trimResults(response);
-      var firstDate, lastDate;
+      var firstDate = new Date();
+      var lastDate = opts.lastDate || new Date();
+      firstDate.setTime(lastDate.getTime() - (MAX_DAYS * MS_IN_DAY));
       if (opts.firstDate) {
         firstDate = new Date(opts.firstDate);
         console.log('Setting first time to ' + firstDate);
       }
       else if (resp && resp.timestamp) {
         var d = new Date(resp.timestamp);
-        firstDate = new Date(d.getTime() + 1);
+        firstDate.setTime(d.getTime() + 1);
         console.log('Setting first time to ' + firstDate);
       }
       else {
@@ -214,12 +216,18 @@ adapter.importData = function(c8, conf, opts) {
           }
         });
       }
-      importData(firstDate, opts.lastDate);
+      if (lastDate.getTime() > (firstDate.getTime() + MAX_DAYS * MS_IN_DAY)) {
+        lastDate.setTime(firstDate.getTime() + MAX_DAYS * MS_IN_DAY);
+        console.warn('Setting last date to ' + lastDate);
+      }
+      importData(c8, conf, firstDate, lastDate);
     });
+  }).catch(function(error) {
+    console.trace(error);
   });
 }
 
-function importData(firstDate, lastDate) {
+function importData(c8, conf, firstDate, lastDate) {
   if (!firstDate) {
     console.warn('No starting date...');
     return;
@@ -260,7 +268,7 @@ function importData(firstDate, lastDate) {
         else {
           var document = JSON.parse(body)[0];
           console.log(document.date);
-          var bulk = splitToBulk(prepareForElastic(document));
+          var bulk = splitToBulk(c8, prepareForElastic(document));
           c8.bulk(bulk).then(function(result) {
             console.log('Indexed ' + result.items.length + ' documents in ' + result.took + ' ms.');
           }).catch(function(error) {
@@ -332,7 +340,7 @@ function prepareForElastic(document) {
   return document;
 }
 
-function splitToBulk(document) {
+function splitToBulk(c8, document) {
   var d = document.date;
   var bulk = [];
   bulk.push({index: {_index: c8.type(summaryType)._index, _type: c8._type}});
