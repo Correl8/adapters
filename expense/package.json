@@ -4,10 +4,11 @@
   "description": "Import data from Expense into Correl8.me",
   "main": "index.js",
   "dependencies": {
+    "correl8-cli": "^0.1.0",
     "request": "^2.65.0"
   },
   "scripts": {
-    "start": "node --harmony index.js --help"
+    "start": "node --harmony node_modules/correl8-cli/app.js -a ../../index.js"
   },
   "author": "Samuel Rinnetmäki <samuel@iki.fi>",
   "license": "ISC"

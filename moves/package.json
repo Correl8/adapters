@@ -4,13 +4,14 @@
   "description": "Import data from Moves app into Correl8.me",
   "main": "index.js",
   "dependencies": {
+    "correl8-cli": "^0.1.0",
     "express": "^4.14.0",
     "moves": "^0.0.2",
     "moves-date": "^0.1.2"
   },
   "devDependencies": {},
   "scripts": {
-    "start": "node --harmony index.js"
+    "start": "node --harmony node_modules/correl8-cli/app.js -a ../../index.js"
   },
   "author": "Samuel Rinnetmäki <samuel@iki.fi>",
   "license": "ISC"

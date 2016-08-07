@@ -4,6 +4,7 @@
   "description": "Import data from Google Calendar into Correl8.me",
   "main": "index.js",
   "dependencies": {
+    "correl8-cli": "^0.1.0",
     "fs": "0.0.2",
     "google-auth-library": "^0.9.7",
     "googleapis": "^2.1.7",
@@ -11,7 +12,7 @@
   },
   "devDependencies": {},
   "scripts": {
-    "start": "node --harmony index.js"
+    "start": "node node_modules/correl8-cli/app.js -a ../../index.js "
   },
   "author": "Samuel Rinnetmäki <samuel@iki.fi>",
   "license": "ISC"

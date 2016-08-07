@@ -4,11 +4,12 @@
   "description": "Import data from Nordpool into Correl8.me",
   "main": "index.js",
   "dependencies": {
+    "correl8-cli": "^0.1.0",
     "nordpool": "^1.0.0"
   },
   "devDependencies": {},
   "scripts": {
-    "start": "node --harmony index.js"
+    "start": "node node_modules/correl8-cli/app.js -a ../../index.js"
   },
   "author": "Samuel Rinnetmäki <samuel@iki.fi>",
   "license": "ISC"
