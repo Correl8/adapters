@@ -11,7 +11,7 @@ adapter.types = [
   {
     name: 'rescuetime',
     fields: {
-      date: 'date',
+      timestamp: 'date',
       spent: 'integer',
       people: 'integer',
       activity: 'string',
