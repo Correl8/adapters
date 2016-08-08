@@ -115,7 +115,7 @@ adapter.importData = function(c8, conf, opts) {
       var bulk = [];
       for (var i = 0; i < rows.length; i++) {
         var row = rows[i];
-        var timeValue = row[conf.timeColumn];
+        var timeValue = row[0];
         var ts = c8.guessTime(timeValue);
         if (!ts) {
           console.warn('Could not parse timestamp on row %d: %s', i, timeValue);
