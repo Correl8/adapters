@@ -13,7 +13,7 @@ adapter.types = [
   {
     name: 'googlesheets-activity',
     fields: {
-      "timestamp": "timestamp",
+      "timestamp": "date",
       "date": "date",
       "stepsWiiU": "integer",
       "caloriesWiiU": "integer"
