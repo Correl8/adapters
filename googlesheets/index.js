@@ -102,7 +102,7 @@ adapter.importData = function(c8, conf, opts) {
   if (conf.range) {
     getParams.range = conf.range;
   }
-  sheets.spreadsheets.values.get(getParams, function(err, response) {
+  return sheets.spreadsheets.values.get(getParams, function(err, response) {
     if (err) {
       console.log('The API returned an error: ' + err);
       return;
@@ -136,7 +136,7 @@ adapter.importData = function(c8, conf, opts) {
         bulk.push(values);
       }
       // console.log(bulk);
-      c8.bulk(bulk).then(function(result) {
+      return c8.bulk(bulk).then(function(result) {
         console.log('Indexed ' + result.items.length + ' rows in ' + result.took + ' ms.');
         bulk = null;
       }).catch(function(error) {
