@@ -168,7 +168,7 @@ adapter.storeConfig = function(c8, result) {
 
 adapter.importData = function(c8, conf, opts) {
   moves = new Moves(conf);
-  c8.type(summaryType).search({
+  return c8.type(summaryType).search({
     _source: ['timestamp'],
     size: 1,
     sort: [{'timestamp': 'desc'}],
@@ -189,7 +189,8 @@ adapter.importData = function(c8, conf, opts) {
       }
       else if (resp && resp.timestamp) {
         var d = new Date(resp.timestamp);
-        firstDate.setTime(d.getTime() + 1);
+        // refetch yesterday for updated summary
+        firstDate.setTime(d.getTime() - MS_IN_DAY);
         console.log('Setting first time to ' + firstDate);
       }
       else {
@@ -221,7 +222,7 @@ adapter.importData = function(c8, conf, opts) {
         lastDate.setTime(firstDate.getTime() + MAX_DAYS * MS_IN_DAY);
         console.warn('Setting last date to ' + lastDate);
       }
-      importData(c8, conf, firstDate, lastDate);
+      return importData(c8, conf, firstDate, lastDate);
     });
   }).catch(function(error) {
     console.trace(error);
@@ -251,7 +252,7 @@ function importData(c8, conf, firstDate, lastDate) {
       }
       else if (response.body === 'expired_access_token') {
         console.warn('access token expired');
-        refreshToken(c8, conf);
+        return refreshToken(c8, conf);
       }
       else if (!response.body) {
         console.warn('No response body in history!');
@@ -267,13 +268,13 @@ function importData(c8, conf, firstDate, lastDate) {
             if (rb.error) {
               console.warn(rb.error);
             }
-          refreshToken(c8, conf);
+          return refreshToken(c8, conf);
         }
         else {
           var document = JSON.parse(body)[0];
           console.log(document.date);
           var bulk = splitToBulk(c8, prepareForElastic(document));
-          c8.bulk(bulk).then(function(result) {
+          return c8.bulk(bulk).then(function(result) {
             console.log('Indexed ' + result.items.length + ' documents in ' + result.took + ' ms.');
           }).catch(function(error) {
             console.trace(error);
@@ -344,8 +345,9 @@ function prepareForElastic(document) {
 function splitToBulk(c8, document) {
   var d = document.date;
   var bulk = [];
-  bulk.push({index: {_index: c8.type(summaryType)._index, _type: c8._type}});
-  bulk.push({timestamp: d, summary: document.summary, caloriesIdle: document.caloriesIdle, lastUpdate: document.lastUpdate});
+  // console.log(JSON.stringify(document));
+  bulk.push({index: {_index: c8.type(summaryType)._index, _type: c8._type, _id: d}});
+  bulk.push({_id: d, timestamp: d, summary: document.summary, caloriesIdle: document.caloriesIdle, lastUpdate: document.lastUpdate});
   if (document.segments && document.segments.length) {
     for (var i=0; i<document.segments.length; i++) {
       var seg = document.segments[i];
