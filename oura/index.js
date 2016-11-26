@@ -163,33 +163,54 @@ adapter.promptProps = {
     },
     redirect_uri: {
       description: 'Enter your redirect URL'.magenta,
-      default: defaultUrl
+      default: redirectUri
     },
   }
 };
 
 adapter.storeConfig = function(c8, result) {
   var conf = result;
-  var defaultUrl = url.parse(conf.redirect_uri);
-  var express = require('express');
-  var app = express();
-  var port = process.env.PORT || defaultUrl.port;
-  var server = app.listen(port, function () {
-    console.log("Please, go to \n" + authUri)
-  });
+  console.log(conf);
+  // return c8.config(conf).then(function(){
+    var defaultUrl = url.parse(conf.redirect_uri);
+    var express = require('express');
+    var app = express();
+    var port = process.env.PORT || defaultUrl.port;
 
-  app.get(defaultUrl.pathname, function (req, res) {
-    Object.assign(conf, req.query);
-    server.close();
-    return c8.config(conf).then(function(){
-      res.send('Access token saved.');
-      console.log('Configuration stored.');
-      c8.release();
-      process.exit();
-    }).catch(function(error) {
-      console.trace(error);
+    var options = {
+      clientId: conf.client_id,
+      clientSecret: conf.client_secret,
+      redirectUri: conf.redirect_uri
+    };
+    var authClient = oura.Auth(options);
+    var authUri = authClient.code.getUri();
+    var server = app.listen(port, function () {
+      console.log("Please, go to \n" + authUri)
     });
-  });
+
+    app.get(defaultUrl.pathname, function (req, res) {
+      return authClient.code.getToken(req.originalUrl).then(function(auth) {
+        return auth.refresh().then(function(refreshed) {
+          Object.assign(conf, auth);
+          server.close();
+          return c8.config(conf).then(function(){
+            res.send('Access token saved.');
+            console.log('Configuration stored.');
+            c8.release();
+            process.exit();
+          }).catch(function(error) {
+            console.trace(error);
+          });
+        }).catch(function(error) {
+          console.trace(error);
+        });
+      }).catch(function(error) {
+        console.trace(error);
+      });
+    });
+  // }).catch(function(error) {
+  //   console.trace(error);
+  // });
 };
 
 adapter.importData = function(c8, conf, opts) {
@@ -268,10 +289,10 @@ function importData(c8, conf, firstDate, lastDate) {
     }).catch(function(error) {
       console.trace(error);
     });
+*/
   }).catch(function(error){
     console.error(error)
   })
-*/
 }
 
 module.exports = adapter;
