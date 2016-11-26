@@ -5,7 +5,7 @@ var oura = require('oura'),
 
 var redirectUri = 'http://localhost:6872/authcallback';
 
-var MAX_DAYS = 50;
+var MAX_DAYS = 10;
 var MS_IN_DAY = 24 * 60 * 60 * 1000;
 var dateFormat = 'YYYY-MM-DD'
 
@@ -127,6 +127,8 @@ adapter.types = [
     name: sleepStateIndex,
     fields: {
       "timestamp": "date",
+      "duration": "integer",
+      "type": "integer",
       "state": "string"
     }
   },
@@ -134,6 +136,7 @@ adapter.types = [
     name: sleepHRIndex,
     fields: {
       "timestamp": "date",
+      "duration": "integer",
       "hr": "integer"
     }
   },
@@ -141,6 +144,8 @@ adapter.types = [
     name: activityClassIndex,
     fields: {
       "timestamp": "date",
+      "duration": "integer",
+      "type": "integer",
       "class": "string"
     }
   },
@@ -148,6 +153,7 @@ adapter.types = [
     name: activityMETIndex,
     fields: {
       "timestamp": "date",
+      "duration": "integer",
       "moveType": "integer"
     }
   },
@@ -170,8 +176,7 @@ adapter.promptProps = {
 
 adapter.storeConfig = function(c8, result) {
   var conf = result;
-  console.log(conf);
-  // return c8.config(conf).then(function(){
+  return c8.config(conf).then(function(){
     var defaultUrl = url.parse(conf.redirect_uri);
     var express = require('express');
     var app = express();
@@ -191,7 +196,7 @@ adapter.storeConfig = function(c8, result) {
     app.get(defaultUrl.pathname, function (req, res) {
       return authClient.code.getToken(req.originalUrl).then(function(auth) {
         return auth.refresh().then(function(refreshed) {
-          Object.assign(conf, auth);
+          Object.assign(conf, refreshed.data);
           server.close();
           return c8.config(conf).then(function(){
             res.send('Access token saved.');
@@ -208,16 +213,12 @@ adapter.storeConfig = function(c8, result) {
         console.trace(error);
       });
     });
-  // }).catch(function(error) {
-  //   console.trace(error);
-  // });
+  }).catch(function(error) {
+    console.trace(error);
+  });
 };
 
 adapter.importData = function(c8, conf, opts) {
-  var token = conf['access_token'];
-  console.log(token);
-  var client = new oura.Client(token);
-
   c8.type(sleepSummaryIndex).search({
     _source: ['timestamp'],
     size: 1,
@@ -230,15 +231,15 @@ adapter.importData = function(c8, conf, opts) {
       sort: [{'timestamp': 'desc'}],
     }).then(function(response) {
       var resp = c8.trimResults(response);
-      var firstDate = moment();
-      var lastDate = opts.lastDate || moment();
+      var firstDate = new Date();
+      var lastDate = opts.lastDate || new Date();
       firstDate.setTime(lastDate.getTime() - (MAX_DAYS * MS_IN_DAY));
       if (opts.firstDate) {
-        firstDate = moment(opts.firstDate);
+        firstDate = new Date(opts.firstDate);
         console.log('Setting first time to ' + firstDate);
       }
       else if (resp && resp.timestamp) {
-        var d = moment(resp.timestamp);
+        var d = new Date(resp.timestamp);
         firstDate.setTime(d.getTime() + 1);
         console.log('Setting first time to ' + firstDate);
       }
@@ -254,15 +255,17 @@ adapter.importData = function(c8, conf, opts) {
 }
 
 function importData(c8, conf, firstDate, lastDate) {
+  var token = conf.access_token;
+  var client = new oura.Client(token);
   if (!firstDate) {
     console.warn('No starting date...');
     return;
   }
-  var start = firstDate.format(dateFormat);
-  var end = lastDate.format(dateFormat);
-  client.sleep(start, end).then(function (json) {
-    var obj = JSON.parse(json);
+  var start = moment(firstDate).format(dateFormat);
+  var end = moment(lastDate).format(dateFormat);
+  client.sleep(start, end).then(function (response) {
     var bulk = [];
+    var obj = response.sleep;
     for (var i=0; i<obj.length; i++) {
       console.log(obj[i].summary_date);
       var sleepStateData = obj[i].hypnogram_5min.split("");
@@ -270,26 +273,84 @@ function importData(c8, conf, firstDate, lastDate) {
       var id = obj[i].timestamp = obj[i].summary_date;
       bulk.push({index: {_index: c8.type(sleepSummaryIndex)._index, _type: c8._type, _id: id}});
       bulk.push(obj[i]);
-      var d = moment(obj[i].bedtime_start);
-      for (var j=0; j<sleepHRData.length; j++) {
-        d.add(10, 'minutes');
-        bulk.push({index: {_index: c8.type(sleepHRIndex)._index, _type: c8._type, _id: d}});
-        bulk.push({timestamp: d, HR: sleepHRData[j]});
+      if (sleepHRData && sleepHRData.length) {
+        var d = moment(obj[i].bedtime_start);
+        var duration = 10 * 60; // seconds
+        for (var j=0; j<sleepHRData.length; j++) {
+          d.add(10, 'minutes');
+          bulk.push({index: {_index: c8.type(sleepHRIndex)._index, _type: c8._type, _id: d.format()}});
+            bulk.push({timestamp: d.format(), duration: duration, HR: sleepHRData[j]});
+        }
       }
-      for (var j=0; j<sleepStateData.length; j++) {
-        d.add(5, 'minutes');
-        bulk.push({index: {_index: c8.type(sleepStateIndex)._index, _type: c8._type, _id: d}});
-        bulk.push({timestamp: d, state: sleepStates[sleepStateData[j]]});
+      if (sleepStateData && sleepStateData.length) {
+        var d = moment(obj[i].bedtime_start);
+        var duration = 5 * 60; // seconds
+        for (var j=0; j<sleepStateData.length; j++) {
+          d.add(5, 'minutes');
+          bulk.push({index: {_index: c8.type(sleepStateIndex)._index, _type: c8._type, _id: d.format()}});
+          bulk.push({timestamp: d.format(), duration: duration, type: sleepStateData[j], state: sleepStates[sleepStateData[j]]});
+        }
       }
     }
-    console.log(JSON.stringify(bulk, 0, 1));
-/*
     c8.bulk(bulk).then(function(result) {
-      console.log('Indexed ' + result.items.length + ' documents in ' + result.took + ' ms.');
+      console.log('Indexed ' + result.items.length + ' sleep documents in ' + result.took + ' ms.');
     }).catch(function(error) {
       console.trace(error);
     });
-*/
+  }).catch(function(error){
+    console.error(error)
+  })
+  client.activity(start, end).then(function (response) {
+    var bulk = [];
+    var obj = response.activity;
+    for (var i=0; i<obj.length; i++) {
+      console.log(obj[i].summary_date);
+      var activityClassData = obj[i].class_5min.split("");
+      var activityMETData = obj[i].met_1min;
+      var id = obj[i].timestamp = obj[i].summary_date;
+      bulk.push({index: {_index: c8.type(activitySummaryIndex)._index, _type: c8._type, _id: id}});
+      bulk.push(obj[i]);
+      if (activityMETData && activityMETData.length) {
+        var d = moment(obj[i].summary_date).hour(4).minute(0).second(0).millisecond(0);
+        var duration = 60; // seconds
+        for (var j=0; j<activityMETData.length; j++) {
+          d.add(1, 'minutes');
+          bulk.push({index: {_index: c8.type(activityMETIndex)._index, _type: c8._type, _id: d.format()}});
+          bulk.push({timestamp: d.format(), duration: duration, met: activityMETData[j]});
+        }
+      }
+      if (activityClassData && activityClassData.length) {
+        var d = moment(obj[i].summary_date).hour(4).minute(0).second(0).millisecond(0);
+        var duration = 5 * 60; // seconds
+        for (var j=0; j<activityClassData.length; j++) {
+          d.add(5, 'minutes');
+          bulk.push({index: {_index: c8.type(activityClassIndex)._index, _type: c8._type, _id: d.format()}});
+          bulk.push({timestamp: d.format(), duration: duration, type: activityClassData[j], "class": activityClasses[activityClassData[j]]});
+        }
+      }
+    }
+    c8.bulk(bulk).then(function(result) {
+      console.log('Indexed ' + result.items.length + ' activity documents in ' + result.took + ' ms.');
+    }).catch(function(error) {
+      console.trace(error);
+    });
+  }).catch(function(error){
+    console.error(error)
+  })
+  client.readiness(start, end).then(function (response) {
+    var bulk = [];
+    var obj = response.readiness;
+    for (var i=0; i<obj.length; i++) {
+      console.log(obj[i].summary_date);
+      var id = obj[i].timestamp = obj[i].summary_date;
+      bulk.push({index: {_index: c8.type(readinessSummaryIndex)._index, _type: c8._type, _id: id}});
+      bulk.push(obj[i]);
+    }
+    c8.bulk(bulk).then(function(result) {
+      console.log('Indexed ' + result.items.length + ' readiness documents in ' + result.took + ' ms.');
+    }).catch(function(error) {
+      console.trace(error);
+    });
   }).catch(function(error){
     console.error(error)
   })
