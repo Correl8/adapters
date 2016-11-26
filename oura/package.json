@@ -1,0 +1,20 @@
+{
+  "name": "correl8-adapter-oura",
+  "version": "1.0.0",
+  "description": "Import data from ŌURA Cloud APIinto Correl8.me",
+  "main": "index.js",
+  "dependencies": {
+    "correl8-cli": "^0.1.0",
+    "express": "^4.14.0",
+    "moment": "^2.17.0",
+    "oura": "^0.2.0",
+    "url": "^0.11.0"
+
+  },
+  "devDependencies": {},
+  "scripts": {
+    "start": "node node_modules/correl8-cli/app.js -a ../../index.js"
+  },
+  "author": "Samuel Rinnetmäki <samuel@iki.fi>",
+  "license": "ISC"
+}
