@@ -22,7 +22,7 @@ adapter.types = [
         label: 'string',
         name: 'string',
         locationId: 'string',
-        tags: 'text',
+        tags: 'string',
         createdAt: 'date',
         updatedAt: 'date',
         id: 'string'
