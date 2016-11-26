@@ -18,7 +18,9 @@ adapter.types = [
       "stepsWiiU": "integer",
       "caloriesWiiU": "integer",
       "stepsOURA": "integer",
-      "caloriesOURA": "integer"
+      "caloriesOURA": "integer",
+      "stepsSpire": "integer",
+      "caloriesSpire": "integer"
     }
   }
 ];
@@ -77,11 +79,12 @@ adapter.storeConfig = function(c8, result) {
             return;
           }
           conf.credentials = token;
-
           c8.config(conf).then(function(){
             console.log('Access credentials saved.');
             c8.release();
             process.exit;
+          }).catch(function(error) {
+            console.log(error);
           });
         });
       }
@@ -123,7 +126,7 @@ adapter.importData = function(c8, conf, opts) {
           console.warn('Could not parse timestamp on row %d: %s', i, timeValue);
           continue;
         }
-        if (!row[1] && !row[2] && !row[3] && !row[4]) {
+        if (!row[1] && !row[2] && !row[3] && !row[4] && !row[5] && !row[6]) {
           // don't import rows without values
           continue;
         }
@@ -133,7 +136,9 @@ adapter.importData = function(c8, conf, opts) {
           stepsWiiU: row[1] ? parseInt(row[1].replace(/\s/, '')) : null,
           caloriesWiiU: row[2] ? parseInt(row[2].replace(/\s/, '')) : null,
           stepsOURA: row[3] ? parseInt(row[3].replace(/\s/, '')) : null,
-          caloriesOURA: row[4] ? parseInt(row[4].replace(/\s/, '')) : null
+          caloriesOURA: row[4] ? parseInt(row[4].replace(/\s/, '')) : null,
+          stepsSpire: row[5] ? parseInt(row[5].replace(/\s/, '')) : null,
+          caloriesSpire: row[6] ? parseInt(row[6].replace(/\s/, '')) : null
         }
         console.log(row.join(', '));
         bulk.push({index: {_index: c8._index, _type: c8._type, _id: row[0]}});
@@ -148,9 +153,6 @@ adapter.importData = function(c8, conf, opts) {
         bulk = null;
       });
     }
-  }).catch(function(error) {
-    console.trace(error);
-    bulk = null;
   });
 };
 
