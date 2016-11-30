@@ -5,7 +5,7 @@ var oura = require('oura'),
 
 var redirectUri = 'http://localhost:6872/authcallback';
 
-var MAX_DAYS = 10;
+var MAX_DAYS = 30;
 var MS_IN_DAY = 24 * 60 * 60 * 1000;
 var dateFormat = 'YYYY-MM-DD'
 
@@ -255,105 +255,121 @@ adapter.importData = function(c8, conf, opts) {
 }
 
 function importData(c8, conf, firstDate, lastDate) {
+  var options = {
+    clientId: conf.client_id,
+    clientSecret: conf.client_secret,
+    redirectUri: conf.redirect_uri
+  };
   var token = conf.access_token;
-  var client = new oura.Client(token);
-  if (!firstDate) {
-    console.warn('No starting date...');
-    return;
-  }
-  var start = moment(firstDate).format(dateFormat);
-  var end = moment(lastDate).format(dateFormat);
-  client.sleep(start, end).then(function (response) {
-    var bulk = [];
-    var obj = response.sleep;
-    for (var i=0; i<obj.length; i++) {
-      console.log(obj[i].summary_date);
-      var sleepStateData = obj[i].hypnogram_5min.split("");
-      var sleepHRData = obj[i].hr_10min;
-      var id = obj[i].timestamp = obj[i].summary_date;
-      bulk.push({index: {_index: c8.type(sleepSummaryIndex)._index, _type: c8._type, _id: id}});
-      bulk.push(obj[i]);
-      if (sleepHRData && sleepHRData.length) {
-        var d = moment(obj[i].bedtime_start);
-        var duration = 10 * 60; // seconds
-        for (var j=0; j<sleepHRData.length; j++) {
-          d.add(10, 'minutes');
-          bulk.push({index: {_index: c8.type(sleepHRIndex)._index, _type: c8._type, _id: d.format()}});
-            bulk.push({timestamp: d.format(), duration: duration, HR: sleepHRData[j]});
-        }
+  var authClient = oura.Auth(options);
+  var auth = authClient.createToken(conf.access_token, conf.refresh_token);
+  auth.refresh().then(function(refreshed) {
+    Object.assign(conf, refreshed.data);
+    return c8.config(conf).then(function(){
+      var client = new oura.Client(conf.access_token);
+      if (!firstDate) {
+        console.warn('No starting date...');
+        return;
       }
-      if (sleepStateData && sleepStateData.length) {
-        var d = moment(obj[i].bedtime_start);
-        var duration = 5 * 60; // seconds
-        for (var j=0; j<sleepStateData.length; j++) {
-          d.add(5, 'minutes');
-          bulk.push({index: {_index: c8.type(sleepStateIndex)._index, _type: c8._type, _id: d.format()}});
-          bulk.push({timestamp: d.format(), duration: duration, type: sleepStateData[j], state: sleepStates[sleepStateData[j]]});
+      var start = moment(firstDate).format(dateFormat);
+      var end = moment(lastDate).format(dateFormat);
+      client.sleep(start, end).then(function (response) {
+        var bulk = [];
+        var obj = response.sleep;
+        for (var i=0; i<obj.length; i++) {
+          console.log(obj[i].summary_date);
+          var sleepStateData = obj[i].hypnogram_5min.split("");
+          var sleepHRData = obj[i].hr_10min;
+          var id = obj[i].timestamp = obj[i].summary_date;
+          bulk.push({index: {_index: c8.type(sleepSummaryIndex)._index, _type: c8._type, _id: id}});
+          bulk.push(obj[i]);
+          if (sleepHRData && sleepHRData.length) {
+            var d = moment(obj[i].bedtime_start);
+            var duration = 10 * 60; // seconds
+            for (var j=0; j<sleepHRData.length; j++) {
+              d.add(10, 'minutes');
+              bulk.push({index: {_index: c8.type(sleepHRIndex)._index, _type: c8._type, _id: d.format()}});
+                bulk.push({timestamp: d.format(), duration: duration, HR: sleepHRData[j]});
+            }
+          }
+          if (sleepStateData && sleepStateData.length) {
+            var d = moment(obj[i].bedtime_start);
+            var duration = 5 * 60; // seconds
+            for (var j=0; j<sleepStateData.length; j++) {
+              d.add(5, 'minutes');
+              bulk.push({index: {_index: c8.type(sleepStateIndex)._index, _type: c8._type, _id: d.format()}});
+              bulk.push({timestamp: d.format(), duration: duration, type: sleepStateData[j], state: sleepStates[sleepStateData[j]]});
+            }
+          }
         }
-      }
-    }
-    c8.bulk(bulk).then(function(result) {
-      console.log('Indexed ' + result.items.length + ' sleep documents in ' + result.took + ' ms.');
-    }).catch(function(error) {
-      console.trace(error);
+        c8.bulk(bulk).then(function(result) {
+          console.log('Indexed ' + result.items.length + ' sleep documents in ' + result.took + ' ms.');
+        }).catch(function(error) {
+          console.trace(error);
+        });
+      }).catch(function(error){
+        console.error(error)
+      })
+      client.activity(start, end).then(function (response) {
+        var bulk = [];
+        var obj = response.activity;
+        for (var i=0; i<obj.length; i++) {
+          console.log(obj[i].summary_date);
+          var activityClassData = obj[i].class_5min.split("");
+          var activityMETData = obj[i].met_1min;
+          var id = obj[i].timestamp = obj[i].summary_date;
+          bulk.push({index: {_index: c8.type(activitySummaryIndex)._index, _type: c8._type, _id: id}});
+          bulk.push(obj[i]);
+          if (activityMETData && activityMETData.length) {
+            var d = moment(obj[i].summary_date).hour(4).minute(0).second(0).millisecond(0);
+            var duration = 60; // seconds
+            for (var j=0; j<activityMETData.length; j++) {
+              d.add(1, 'minutes');
+              bulk.push({index: {_index: c8.type(activityMETIndex)._index, _type: c8._type, _id: d.format()}});
+              bulk.push({timestamp: d.format(), duration: duration, met: activityMETData[j]});
+            }
+          }
+          if (activityClassData && activityClassData.length) {
+            var d = moment(obj[i].summary_date).hour(4).minute(0).second(0).millisecond(0);
+            var duration = 5 * 60; // seconds
+            for (var j=0; j<activityClassData.length; j++) {
+              d.add(5, 'minutes');
+              bulk.push({index: {_index: c8.type(activityClassIndex)._index, _type: c8._type, _id: d.format()}});
+              bulk.push({timestamp: d.format(), duration: duration, type: activityClassData[j], "class": activityClasses[activityClassData[j]]});
+            }
+          }
+        }
+        c8.bulk(bulk).then(function(result) {
+          console.log('Indexed ' + result.items.length + ' activity documents in ' + result.took + ' ms.');
+        }).catch(function(error) {
+          console.trace(error);
+        });
+      }).catch(function(error){
+        console.error(error)
+      })
+      client.readiness(start, end).then(function (response) {
+        var bulk = [];
+        var obj = response.readiness;
+        for (var i=0; i<obj.length; i++) {
+          console.log(obj[i].summary_date);
+          var id = obj[i].timestamp = obj[i].summary_date;
+          bulk.push({index: {_index: c8.type(readinessSummaryIndex)._index, _type: c8._type, _id: id}});
+          bulk.push(obj[i]);
+        }
+        c8.bulk(bulk).then(function(result) {
+          console.log('Indexed ' + result.items.length + ' readiness documents in ' + result.took + ' ms.');
+        }).catch(function(error) {
+          console.trace(error);
+        });
+      }).catch(function(error){
+        console.error(error)
+      });
+    }).catch(function(error){
+      console.error(error)
     });
   }).catch(function(error){
     console.error(error)
-  })
-  client.activity(start, end).then(function (response) {
-    var bulk = [];
-    var obj = response.activity;
-    for (var i=0; i<obj.length; i++) {
-      console.log(obj[i].summary_date);
-      var activityClassData = obj[i].class_5min.split("");
-      var activityMETData = obj[i].met_1min;
-      var id = obj[i].timestamp = obj[i].summary_date;
-      bulk.push({index: {_index: c8.type(activitySummaryIndex)._index, _type: c8._type, _id: id}});
-      bulk.push(obj[i]);
-      if (activityMETData && activityMETData.length) {
-        var d = moment(obj[i].summary_date).hour(4).minute(0).second(0).millisecond(0);
-        var duration = 60; // seconds
-        for (var j=0; j<activityMETData.length; j++) {
-          d.add(1, 'minutes');
-          bulk.push({index: {_index: c8.type(activityMETIndex)._index, _type: c8._type, _id: d.format()}});
-          bulk.push({timestamp: d.format(), duration: duration, met: activityMETData[j]});
-        }
-      }
-      if (activityClassData && activityClassData.length) {
-        var d = moment(obj[i].summary_date).hour(4).minute(0).second(0).millisecond(0);
-        var duration = 5 * 60; // seconds
-        for (var j=0; j<activityClassData.length; j++) {
-          d.add(5, 'minutes');
-          bulk.push({index: {_index: c8.type(activityClassIndex)._index, _type: c8._type, _id: d.format()}});
-          bulk.push({timestamp: d.format(), duration: duration, type: activityClassData[j], "class": activityClasses[activityClassData[j]]});
-        }
-      }
-    }
-    c8.bulk(bulk).then(function(result) {
-      console.log('Indexed ' + result.items.length + ' activity documents in ' + result.took + ' ms.');
-    }).catch(function(error) {
-      console.trace(error);
-    });
-  }).catch(function(error){
-    console.error(error)
-  })
-  client.readiness(start, end).then(function (response) {
-    var bulk = [];
-    var obj = response.readiness;
-    for (var i=0; i<obj.length; i++) {
-      console.log(obj[i].summary_date);
-      var id = obj[i].timestamp = obj[i].summary_date;
-      bulk.push({index: {_index: c8.type(readinessSummaryIndex)._index, _type: c8._type, _id: id}});
-      bulk.push(obj[i]);
-    }
-    c8.bulk(bulk).then(function(result) {
-      console.log('Indexed ' + result.items.length + ' readiness documents in ' + result.took + ' ms.');
-    }).catch(function(error) {
-      console.trace(error);
-    });
-  }).catch(function(error){
-    console.error(error)
-  })
+  });
 }
 
 module.exports = adapter;
