@@ -5,7 +5,7 @@ var oura = require('oura'),
 
 var redirectUri = 'http://localhost:6872/authcallback';
 
-var MAX_DAYS = 10;
+var MAX_DAYS = 30;
 var MS_IN_DAY = 24 * 60 * 60 * 1000;
 var dateFormat = 'YYYY-MM-DD'
 
@@ -278,6 +278,10 @@ function importData(c8, conf, firstDate, lastDate) {
         var duration = 10 * 60; // seconds
         for (var j=0; j<sleepHRData.length; j++) {
           d.add(10, 'minutes');
+          if (sleepHRData[j] == 255) {
+            // ignore values of 255 - they seem to be unknowns
+            continue;
+          }
           bulk.push({index: {_index: c8.type(sleepHRIndex)._index, _type: c8._type, _id: d.format()}});
             bulk.push({timestamp: d.format(), duration: duration, HR: sleepHRData[j]});
         }
