@@ -8,6 +8,7 @@ adapter.types = [
   {
     name: 'twine',
     fields: {
+      timestamp: 'date',
       meta: {
         sensor: 'string',
         battery: 'string',
@@ -18,7 +19,7 @@ adapter.types = [
         timestamp: 'integer'
       },
       values: {
-        batteryVoltage: 'integer',
+        batteryVoltage: 'float',
         firmwareVersion: 'string',
         isVibrating: 'boolean',
         orientation: 'string',
@@ -59,7 +60,7 @@ adapter.importData = function(c8, conf, opts) {
         console.trace(err);
         return;
       }
-      response._id = response.time.timestamp;
+      response.id = response.time.timestamp;
       response.meta.sensor = conf.deviceId;
       response.timestamp = new Date(response.time.timestamp * 1000);
       console.log(response.timestamp);

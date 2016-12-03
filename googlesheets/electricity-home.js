@@ -7,16 +7,18 @@ var adapter = {};
 
 var SCOPES = ['https://www.googleapis.com/auth/spreadsheets.readonly'];
 
-adapter.sensorName = 'googlesheets-activity';
+adapter.sensorName = 'googlesheets-electricity-home';
 
 adapter.types = [
   {
-    name: 'googlesheets-activity',
+    name: 'googlesheets-electricity-home',
     fields: {
       "timestamp": "date",
       "date": "date",
-      "stepsWiiU": "integer",
-      "caloriesWiiU": "integer"
+      "consumptionEnergyDay": "float",
+      "consumptionEnergyNight": "float",
+      "consumptionEnergyTotal": "float",
+      "days": "integer"
     }
   }
 ];
@@ -28,10 +30,12 @@ adapter.promptProps = {
       default: 'client_secret.json'
     },
     sheetID: {
-      description: 'ID of the sheet'.magenta
+      description: 'ID of the sheet'.magenta,
+      default: '1T4gQTusGUNayFCzq68bgXPlsx5kJcXd2sPs3xHNP1_g'
     },
     range: {
-      description: 'Range of cells to import (e.g. Sheet1!A1:Z999)'.magenta
+      description: 'Range of cells to import (e.g. Sheet1!A1:Z999)'.magenta,
+      default: 'A3:E999'
     }
   }
 };
@@ -60,7 +64,8 @@ adapter.storeConfig = function(c8, result) {
     var promptProps = {
       properties: {
         code: {
-          description: 'Enter the code shown on page'.magenta
+            description: 'Enter the code shown on page'.magenta,
+	    default: conf.code
         },
       }
     }
@@ -74,6 +79,7 @@ adapter.storeConfig = function(c8, result) {
             console.log('Error while trying to retrieve access token', err);
             return;
           }
+          conf.code = result.code;
           conf.credentials = token;
 
           c8.config(conf).then(function(){
@@ -97,12 +103,14 @@ adapter.importData = function(c8, conf, opts) {
   var sheets = google.sheets('v4');
   var getParams = {
     auth: oauth2Client,
-    spreadsheetId: conf.sheetID
+    spreadsheetId: conf.sheetID,
+    valueRenderOption: 'UNFORMATTED_VALUE',
+    dateTimeRenderOption: 'FORMATTED_STRING'
   };
   if (conf.range) {
     getParams.range = conf.range;
   }
-  return sheets.spreadsheets.values.get(getParams, function(err, response) {
+  sheets.spreadsheets.values.get(getParams, function(err, response) {
     if (err) {
       console.log('The API returned an error: ' + err);
       return;
@@ -115,24 +123,22 @@ adapter.importData = function(c8, conf, opts) {
       var bulk = [];
       for (var i = 0; i < rows.length; i++) {
         var row = rows[i];
-        var timeValue = row[0];
-        var ts = c8.guessTime(timeValue);
-        if (!ts) {
-          console.warn('Could not parse timestamp on row %d: %s', i, timeValue);
-          continue;
-        }
+        var timeArray = row[0].split('.');
+          var ts = new Date(timeArray[2], parseInt(timeArray[1])-1 , timeArray[0]);
         if (!row[1] && !row[2]) {
-          // don't import rows witout values
-          continue;
+          break;
         }
         var values = {
           timestamp: ts,
-          date: row[0],
-          stepsWiiU: row[1] ? parseInt(row[1].replace(/\s/, '')) : null,
-          caloriesWiiU: row[2] ? parseInt(row[2].replace(/\s/, '')) : null
+          date: ts,
+          consumptionEnergyDay: Math.round(row[4]*100)/100,
+          consumptionEnergyNight: Math.round(row[5]*100)/100,
+          consumptionEnergyTotal: Math.round(row[6]*100)/100,
+          days: row[3]
         }
-        console.log(row.join(', '));
-        bulk.push({index: {_index: c8._index, _type: c8._type, _id: row[0]}});
+	  console.log(row[0]);
+          console.log(ts + ': ' + Math.round(row[6]*100)/100 + ' kWh');
+        bulk.push({index: {_index: c8._index, _type: c8._type, _id: ts}});
         bulk.push(values);
       }
       // console.log(bulk);
@@ -144,9 +150,6 @@ adapter.importData = function(c8, conf, opts) {
         bulk = null;
       });
     }
-  }).catch(function(error) {
-    console.trace(error);
-    bulk = null;
   });
 };
 

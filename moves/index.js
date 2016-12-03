@@ -3,7 +3,7 @@ var dates = require('moves-date');
 var express = require('express');
 var moves;
 
-var defaultPort = 3000;
+var defaultPort = 3321;
 var defaultUrl = 'http://localhost:' + defaultPort + '/';
 var MAX_DAYS = 50;
 var MS_IN_DAY = 24 * 60 * 60 * 1000;
@@ -154,6 +154,7 @@ adapter.storeConfig = function(c8, result) {
           });
         }
         else {
+          res.send('Authorization failed');
           console.error('Authorization failed');
           console.trace(res);
         }
@@ -167,7 +168,7 @@ adapter.storeConfig = function(c8, result) {
 
 adapter.importData = function(c8, conf, opts) {
   moves = new Moves(conf);
-  c8.type(summaryType).search({
+  return c8.type(summaryType).search({
     _source: ['timestamp'],
     size: 1,
     sort: [{'timestamp': 'desc'}],
@@ -188,7 +189,8 @@ adapter.importData = function(c8, conf, opts) {
       }
       else if (resp && resp.timestamp) {
         var d = new Date(resp.timestamp);
-        firstDate.setTime(d.getTime() + 1);
+        // refetch yesterday for updated summary
+        firstDate.setTime(d.getTime() - MS_IN_DAY);
         console.log('Setting first time to ' + firstDate);
       }
       else {
@@ -198,14 +200,14 @@ adapter.importData = function(c8, conf, opts) {
             return;
           }
           else if (response.body === 'expired_access_token') {
-            refreshToken(conf);
+            console.warn('access token expired');
+            refreshToken(c8, conf);
           }
           else {
             var rb = JSON.parse(response.body);
             if (!rb || rb.error) {
               console.trace(rb.error);
-              refreshToken(conf);
-              return;
+              refreshToken(c8, conf);
             }
             else {
               var user = JSON.parse(body);
@@ -220,7 +222,7 @@ adapter.importData = function(c8, conf, opts) {
         lastDate.setTime(firstDate.getTime() + MAX_DAYS * MS_IN_DAY);
         console.warn('Setting last date to ' + lastDate);
       }
-      importData(c8, conf, firstDate, lastDate);
+      return importData(c8, conf, firstDate, lastDate);
     });
   }).catch(function(error) {
     console.trace(error);
@@ -249,8 +251,8 @@ function importData(c8, conf, firstDate, lastDate) {
         return;
       }
       else if (response.body === 'expired_access_token') {
-        refreshToken();
-        return;
+        console.warn('access token expired');
+        return refreshToken(c8, conf);
       }
       else if (!response.body) {
         console.warn('No response body in history!');
@@ -262,14 +264,17 @@ function importData(c8, conf, firstDate, lastDate) {
       }
       else {
         var rb = JSON.parse(response.body);
-        if (!rb || rb.error) {
-          refreshToken(getHistory);
+          if (!rb || rb.error) {
+            if (rb.error) {
+              console.warn(rb.error);
+            }
+          return refreshToken(c8, conf);
         }
         else {
           var document = JSON.parse(body)[0];
           console.log(document.date);
           var bulk = splitToBulk(c8, prepareForElastic(document));
-          c8.bulk(bulk).then(function(result) {
+          return c8.bulk(bulk).then(function(result) {
             console.log('Indexed ' + result.items.length + ' documents in ' + result.took + ' ms.');
           }).catch(function(error) {
             console.trace(error);
@@ -289,27 +294,24 @@ function importData(c8, conf, firstDate, lastDate) {
   }
 }
 
-function refreshToken(next) {
-  console.log('Refreshing token...');
-  moves.refresh_token(refresh_token, function(error, response, body) {
+function refreshToken(c8, conf) {
+  moves.refresh_token(conf.refresh_token, function(error, response, body) {
     if (error) {
       console.warn('Refresh got error: ' + error);
       return;
     }
-    // console.log(body); // should store!
     var rb = JSON.parse(response.body);
-    // console.log(rb);
+    console.log(rb);
     if (!rb || rb.error) {
       if (rb.error === 'invalid_grant') {
         console.trace(rb.error);
-        // getToken(next);
       }
       console.trace(rb.error);
-      // reauthorize();
     }
     else {
-      console.log('Token refreshed. Try again!')
-      // next(); // possible infinite loop!
+      c8.conf(Object.assign(conf, rb)).then(function() {
+        console.log('Token refreshed. Try again!')
+      });
     }
   });
 }
@@ -343,8 +345,9 @@ function prepareForElastic(document) {
 function splitToBulk(c8, document) {
   var d = document.date;
   var bulk = [];
-  bulk.push({index: {_index: c8.type(summaryType)._index, _type: c8._type}});
-  bulk.push({timestamp: d, summary: document.summary, caloriesIdle: document.caloriesIdle, lastUpdate: document.lastUpdate});
+  // console.log(JSON.stringify(document));
+  bulk.push({index: {_index: c8.type(summaryType)._index, _type: c8._type, _id: d}});
+  bulk.push({_id: d, timestamp: d, summary: document.summary, caloriesIdle: document.caloriesIdle, lastUpdate: document.lastUpdate});
   if (document.segments && document.segments.length) {
     for (var i=0; i<document.segments.length; i++) {
       var seg = document.segments[i];
