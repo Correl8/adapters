@@ -1,13 +1,13 @@
 {
-  "name": "correl8-adapter-expense",
+  "name": "correl8-adapter-example",
   "version": "1.0.0",
-  "description": "Import data from Expense into Correl8.me",
+  "description": "Import data from Example service into Correl8.me",
   "main": "index.js",
   "dependencies": {
     "request": "^2.65.0"
   },
   "scripts": {
-    "start": "node --harmony index.js --help"
+    "start": "node node_modules/correl8-cli/app.js -a ../../index.js"
   },
   "author": "Samuel Rinnetmäki <samuel@iki.fi>",
   "license": "ISC"
