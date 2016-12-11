@@ -276,11 +276,14 @@ function importData(c8, conf, firstDate, lastDate) {
       client.sleep(start, end).then(function (response) {
         var bulk = [];
         var obj = response.sleep;
-        for (var i=0; i<obj.length; i++) {
-          console.log(obj[i].summary_date);
+          for (var i=0; i<obj.length; i++) {
+          // var summaryDate = obj[i].summary_date;
+          var summaryDate = moment(obj[i].bedtime_end).format('YYYY-MM-DD');
+          console.log(summaryDate);
           var sleepStateData = obj[i].hypnogram_5min.split("");
           var sleepHRData = obj[i].hr_10min;
-          var id = obj[i].timestamp = obj[i].summary_date;
+          obj[i].timestamp = summaryDate;
+          var id = summaryDate + obj[i].period_id;
           bulk.push({index: {_index: c8.type(sleepSummaryIndex)._index, _type: c8._type, _id: id}});
           bulk.push(obj[i]);
           if (sleepHRData && sleepHRData.length) {
@@ -288,6 +291,10 @@ function importData(c8, conf, firstDate, lastDate) {
             var duration = 10 * 60; // seconds
             for (var j=0; j<sleepHRData.length; j++) {
               d.add(10, 'minutes');
+              if (sleepHRData[j] == 255) {
+                // ignore value, it's likely faulty
+                continue;
+              }
               bulk.push({index: {_index: c8.type(sleepHRIndex)._index, _type: c8._type, _id: d.format()}});
                 bulk.push({timestamp: d.format(), duration: duration, HR: sleepHRData[j]});
             }
@@ -314,14 +321,15 @@ function importData(c8, conf, firstDate, lastDate) {
         var bulk = [];
         var obj = response.activity;
         for (var i=0; i<obj.length; i++) {
-          console.log(obj[i].summary_date);
+          var summaryDate = obj[i].summary_date;
+          console.log(summaryDate);
           var activityClassData = obj[i].class_5min.split("");
           var activityMETData = obj[i].met_1min;
-          var id = obj[i].timestamp = obj[i].summary_date;
+          var id = obj[i].timestamp = summaryDate;
           bulk.push({index: {_index: c8.type(activitySummaryIndex)._index, _type: c8._type, _id: id}});
           bulk.push(obj[i]);
           if (activityMETData && activityMETData.length) {
-            var d = moment(obj[i].summary_date).hour(4).minute(0).second(0).millisecond(0);
+            var d = moment(summaryDate).hour(4).minute(0).second(0).millisecond(0);
             var duration = 60; // seconds
             for (var j=0; j<activityMETData.length; j++) {
               d.add(1, 'minutes');
@@ -330,7 +338,7 @@ function importData(c8, conf, firstDate, lastDate) {
             }
           }
           if (activityClassData && activityClassData.length) {
-            var d = moment(obj[i].summary_date).hour(4).minute(0).second(0).millisecond(0);
+            var d = moment(summaryDate).hour(4).minute(0).second(0).millisecond(0);
             var duration = 5 * 60; // seconds
             for (var j=0; j<activityClassData.length; j++) {
               d.add(5, 'minutes');
@@ -351,8 +359,9 @@ function importData(c8, conf, firstDate, lastDate) {
         var bulk = [];
         var obj = response.readiness;
         for (var i=0; i<obj.length; i++) {
-          console.log(obj[i].summary_date);
-          var id = obj[i].timestamp = obj[i].summary_date;
+          var summaryDate = obj[i].summary_date;
+          console.log(summaryDate);
+          var id = obj[i].timestamp = summaryDate;
           bulk.push({index: {_index: c8.type(readinessSummaryIndex)._index, _type: c8._type, _id: id}});
           bulk.push(obj[i]);
         }
