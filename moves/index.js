@@ -5,7 +5,8 @@ var moves;
 
 var defaultPort = 3321;
 var defaultUrl = 'http://localhost:' + defaultPort + '/';
-var MAX_DAYS = 50;
+// var MAX_DAYS = 50;
+var MAX_DAYS = 7;
 var MS_IN_DAY = 24 * 60 * 60 * 1000;
 
 var adapter = {};
@@ -21,7 +22,7 @@ var placeType = 'moves-place';
 
 adapter.types = [
   {
-    name: 'moves-summary',
+    name: summaryType,
     fields: {
       timestamp: 'date',
       summary: {
@@ -37,7 +38,7 @@ adapter.types = [
     }
   },
   {
-    name: 'moves-move',
+    name: moveType,
     fields: {
       type: 'string',
       startTime: 'date',
@@ -63,7 +64,7 @@ adapter.types = [
     }
   },
   {
-    name: 'moves-place',
+    name: placeType,
     fields: {
       type: 'string',
       startTime: 'date',
@@ -182,6 +183,7 @@ adapter.importData = function(c8, conf, opts) {
       var resp = c8.trimResults(response);
       var firstDate = new Date();
       var lastDate = opts.lastDate || new Date();
+      var goneAsync = false;
       firstDate.setTime(lastDate.getTime() - (MAX_DAYS * MS_IN_DAY));
       if (opts.firstDate) {
         firstDate = new Date(opts.firstDate);
@@ -194,7 +196,8 @@ adapter.importData = function(c8, conf, opts) {
         console.log('Setting first time to ' + firstDate);
       }
       else {
-        moves.get('/user/profile', conf.access_token, function(error, response, body) {
+        goneAsync = true;
+        return moves.get('/user/profile', conf.access_token, function(error, response, body) {
           if (error) {
             console.trace(error);
             return;
@@ -212,17 +215,16 @@ adapter.importData = function(c8, conf, opts) {
             else {
               var user = JSON.parse(body);
               // console.log(user);
-              // console.log('Setting first time to Moves date ' + user.profile.firstDate);
+              console.log('Setting first time to Moves date ' + user.profile.firstDate);
               firstDate = dates.parseISODate(user.profile.firstDate);
+              return importData(c8, conf, firstDate, lastDate);
             }
           }
         });
       }
-      if (lastDate.getTime() > (firstDate.getTime() + MAX_DAYS * MS_IN_DAY)) {
-        lastDate.setTime(firstDate.getTime() + MAX_DAYS * MS_IN_DAY);
-        console.warn('Setting last date to ' + lastDate);
+      if (!goneAsync) {
+        return importData(c8, conf, firstDate, lastDate);
       }
-      return importData(c8, conf, firstDate, lastDate);
     });
   }).catch(function(error) {
     console.trace(error);
@@ -233,6 +235,10 @@ function importData(c8, conf, firstDate, lastDate) {
   if (!firstDate) {
     console.warn('No starting date...');
     return;
+  }
+  if (lastDate.getTime() > (firstDate.getTime() + MAX_DAYS * MS_IN_DAY)) {
+    lastDate.setTime(firstDate.getTime() + MAX_DAYS * MS_IN_DAY);
+    console.warn('Setting last date to ' + lastDate);
   }
   var startTime = firstDate;
   // startTime.setDate(startTime.getDate() + 1);
@@ -271,9 +277,16 @@ function importData(c8, conf, firstDate, lastDate) {
           return refreshToken(c8, conf);
         }
         else {
-          var document = JSON.parse(body)[0];
-          console.log(document.date);
-          var bulk = splitToBulk(c8, prepareForElastic(document));
+          // console.log(body);
+          var documents = JSON.parse(body);
+          var bulk = [];
+          for (var i=0; i<documents.length; i++) {
+            var document = documents[i];
+            console.log(document.date);
+            var prepared = splitToBulk(c8, prepareForElastic(document));
+            bulk = bulk.concat(prepared);
+          }
+          // console.log(JSON.stringify(bulk));
           return c8.bulk(bulk).then(function(result) {
             console.log('Indexed ' + result.items.length + ' documents in ' + result.took + ' ms.');
           }).catch(function(error) {
@@ -347,7 +360,7 @@ function splitToBulk(c8, document) {
   var bulk = [];
   // console.log(JSON.stringify(document));
   bulk.push({index: {_index: c8.type(summaryType)._index, _type: c8._type, _id: d}});
-  bulk.push({_id: d, timestamp: d, summary: document.summary, caloriesIdle: document.caloriesIdle, lastUpdate: document.lastUpdate});
+  bulk.push({id: d, timestamp: d, summary: document.summary, caloriesIdle: document.caloriesIdle, lastUpdate: document.lastUpdate});
   if (document.segments && document.segments.length) {
     for (var i=0; i<document.segments.length; i++) {
       var seg = document.segments[i];

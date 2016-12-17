@@ -12,10 +12,7 @@ var adapter = {};
 
 adapter.sensorName = 'lumo';
 
-var postureIndex = 'lumo-posture';
-var caloriesIndex = 'lumo-calories';
-var distanceIndex = 'lumo-distance';
-var stepsIndex = 'lumo-steps';
+var postureIndex = 'lumo';
 
 adapter.types = [
   {
@@ -26,45 +23,20 @@ adapter.types = [
       "dataSource": "string",
       "dataType": "string",
       "value": "integer",
+      "upluadTime": "date",
       "badPostureDuration": "integer",
-      "goodPostureDuration": "integer"
-    }
-  },
-  {
-    name: caloriesIndex,
-    fields: {
-      "timestamp": "date",
-      "localTime": "date",
-      "dataSource": "string",
-      "dataType": "string",
-      "value": "integer",
+      "goodPostureDuration": "integer",
       "totalCalories": "integer",
       "walkingCalories": "integer",
-      "runningCalories": "integer"
-    }
-  },
-  {
-    name: distanceIndex,
-    fields: {
-      "timestamp": "date",
-      "localTime": "date",
-      "dataSource": "string",
-      "dataType": "string",
-      "value": "integer",
+      "runningCalories": "integer",
+      "walkingDuration": "integer",
+      "runningDuration": "integer",
       "totalDistance": "integer",
-      "runningDistance": "integer"
-    }
-  },
-  {
-    name: stepsIndex,
-    fields: {
-      "timestamp": "date",
-      "localTime": "date",
-      "dataSource": "string",
-      "dataType": "string",
-      "value": "integer",
+      "runningDistance": "integer",
+      // "walkingDistance": "integer",
       "totalSteps": "integer",
-      "runningSteps": "integer"
+      "runningSteps": "integer",
+      // "walkingSteps": "integer"
     }
   }
 ];
@@ -129,7 +101,7 @@ adapter.storeConfig = function(c8, result) {
 };
 
 adapter.importData = function(c8, conf, opts) {
-  c8.type(sleepSummaryIndex).search({
+  c8.type(postureIndex).search({
     _source: ['timestamp'],
     size: 1,
     sort: [{'timestamp': 'desc'}],
@@ -188,55 +160,57 @@ function importData(c8, conf, firstDate, lastDate) {
         var obj = response.data;
         var index = postureIndex;
         for (var i=0; i<obj.length; i++) {
-          var ts = obj[i].localTime; // local time or UTC???
+          obj[i].localTime = obj[i].localTime * 1000;
+          obj[i].uploadTime = obj[i].uploadTime * 1000;
+          // local time will be handled as if it was UTC
+          var ts = new Date(obj[i].localTime);
+          var tzOffset = ts.getTimezoneOffset() * 60 * 1000;
+          ts.setTime(ts.getTime() + tzOffset);
+          obj[i].localTime += tzOffset;    
           obj[i].timestamp = ts;
-          console.log(ts);
           var type = obj[i].dataType;
           if (type == 'TOTAL_STEPS') {
             obj[i].totalSteps = obj[i].value;
-            index = stepsIndex;
           }
           else if (type == 'RUNNING_STEPS') {
             obj[i].runningSteps = obj[i].value;
-            index = stepsIndex;
           }
           else if (type == 'TOTAL_DISTANCE') {
             obj[i].totalDistance = obj[i].value;
-            index = distanceIndex;
           }
           else if (type == 'RUNNING_DISTANCE') {
             obj[i].runningDistance = obj[i].value;
-            index = distanceIndex;
           }
           else if (type == 'TOTAL_CALORIES') {
             obj[i].totalCalories = obj[i].value;
-            index = caloriesIndex;
           }
           else if (type == 'WALKING_CALORIES') {
             obj[i].walkingCalories = obj[i].value;
-            index = caloriesIndex;
+          }
+          else if (type == 'TIME_WALKING') {
+            obj[i].walkingDuration = obj[i].value;
           }
           else if (type == 'RUNNING_CALORIES') {
             obj[i].runningCalories = obj[i].value;
-            index = caloriesIndex;
           }
           else if (type == 'TIME_IN_GOOD_POSTURE') {
             obj[i].goodPostureDuration = obj[i].value;
-            index = postureIndex;
           }
           else if (type == 'TIME_IN_BAD_POSTURE') {
             obj[i].badPostureDuration = obj[i].value;
-            index = postureIndex;
           }
-          var id = ts + '-' + obj[i].dataSource + '-' + type;
-          bulk.push({index: {_index: c8.type(index)._index, _type: c8._type, _id: id}});
+          var id = ts.getTime() + '-' + obj[i].dataSource + '-' + type;
+          console.log(id + ': ' + obj[i].value);
+          bulk.push({index: {_index: c8._index, _type: c8._type, _id: id}});
           bulk.push(obj[i]);
         }
-        c8.bulk(bulk).then(function(result) {
-          console.log('Indexed ' + result.items.length + ' documents in ' + result.took + ' ms.');
-        }).catch(function(error) {
-          console.trace(error);
-        });
+        if (bulk.length > 0) {
+          return c8.bulk(bulk).then(function(result) {
+            console.log('Indexed ' + result.items.length + ' documents in ' + result.took + ' ms.');
+          }).catch(function(error) {
+            console.trace(error);
+          });
+        }
       }).catch(function(error){
         console.error(error)
       })
