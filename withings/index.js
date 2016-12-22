@@ -3,7 +3,7 @@ var express = require('express'),
   url = require('url'),
   Withings = require('withings-oauth2').Withings
 
-var redirectUri = 'http://localhost:5866/authcallback';
+var redirectUri = 'http://localhost:9484/authcallback';
 
 var MAX_DAYS = 30;
 var MS_IN_DAY = 24 * 60 * 60 * 1000;
@@ -16,7 +16,7 @@ measTypes[8] = 'Fat Mass Weight';
 measTypes[9] = 'Diastolic Blood Pressure';
 measTypes[10] = 'Systolic Blood Pressure';
 measTypes[11] = 'Heart Pulse';
-measTypes[12] = 'Temperature';
+measTypes[12] = 'Room Temperature';
 measTypes[54] = 'SP02';
 measTypes[71] = 'Body Temperature';
 measTypes[73] = 'Skin Temperature';
