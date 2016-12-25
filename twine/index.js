@@ -60,7 +60,7 @@ adapter.importData = function(c8, conf, opts) {
         console.trace(err);
         return;
       }
-      response.id = response.time.timestamp;
+      response.id = response.time.timestamp + '-' + conf.deviceId;
       response.meta.sensor = conf.deviceId;
       response.timestamp = new Date(response.time.timestamp * 1000);
       console.log(response.timestamp);
