@@ -199,7 +199,7 @@ function importData(c8, conf, firstDate, lastDate) {
           else if (type == 'TIME_IN_BAD_POSTURE') {
             obj[i].badPostureDuration = obj[i].value;
           }
-          var id = ts.getTime() + '-' + obj[i].dataSource + '-' + type;
+          var id = ts.toISOString() + '-' + obj[i].dataSource + '-' + type;
           console.log(id + ': ' + obj[i].value);
           bulk.push({index: {_index: c8._index, _type: c8._type, _id: id}});
           bulk.push(obj[i]);
