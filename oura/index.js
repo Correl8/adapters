@@ -276,7 +276,7 @@ function importData(c8, conf, firstDate, lastDate) {
       client.sleep(start, end).then(function (response) {
         var bulk = [];
         var obj = response.sleep;
-          for (var i=0; i<obj.length; i++) {
+        for (var i=0; i<obj.length; i++) {
           // var summaryDate = obj[i].summary_date;
           var summaryDate = moment(obj[i].bedtime_end).format('YYYY-MM-DD');
           console.log(summaryDate);
@@ -309,11 +309,16 @@ function importData(c8, conf, firstDate, lastDate) {
             }
           }
         }
-        c8.bulk(bulk).then(function(result) {
-          console.log('Indexed ' + result.items.length + ' sleep documents in ' + result.took + ' ms.');
-        }).catch(function(error) {
-          console.trace(error);
-        });
+        if (bulk.length > 0) {
+          c8.bulk(bulk).then(function(result) {
+            console.log('Indexed ' + result.items.length + ' sleep documents in ' + result.took + ' ms.');
+          }).catch(function(error) {
+            console.trace(error);
+          });
+        }
+        else {
+          console.log('No sleep to import');
+        }
       }).catch(function(error){
         console.error(error)
       })
@@ -347,11 +352,16 @@ function importData(c8, conf, firstDate, lastDate) {
             }
           }
         }
-        c8.bulk(bulk).then(function(result) {
-          console.log('Indexed ' + result.items.length + ' activity documents in ' + result.took + ' ms.');
-        }).catch(function(error) {
-          console.trace(error);
-        });
+        if (bulk.length > 0) {
+          c8.bulk(bulk).then(function(result) {
+            console.log('Indexed ' + result.items.length + ' activity documents in ' + result.took + ' ms.');
+          }).catch(function(error) {
+            console.trace(error);
+          });
+        }
+        else {
+          console.log('No activity to import');
+        }
       }).catch(function(error){
         console.error(error)
       })
@@ -365,11 +375,16 @@ function importData(c8, conf, firstDate, lastDate) {
           bulk.push({index: {_index: c8.type(readinessSummaryIndex)._index, _type: c8._type, _id: id}});
           bulk.push(obj[i]);
         }
-        c8.bulk(bulk).then(function(result) {
-          console.log('Indexed ' + result.items.length + ' readiness documents in ' + result.took + ' ms.');
-        }).catch(function(error) {
-          console.trace(error);
-        });
+        if (bulk.length > 0) {
+          c8.bulk(bulk).then(function(result) {
+            console.log('Indexed ' + result.items.length + ' readiness documents in ' + result.took + ' ms.');
+          }).catch(function(error) {
+            console.trace(error);
+          });
+        }
+        else {
+          console.log('No readiness data to import');
+        }
       }).catch(function(error){
         console.error(error)
       });
