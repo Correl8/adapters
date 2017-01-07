@@ -1,14 +1,14 @@
 {
-  "name": "correl8-adapter-moves",
+  "name": "correl8-adapter-withings",
   "version": "1.0.0",
-  "description": "Import data from Moves app into Correl8.me",
+  "description": "Import data from Withings API into Correl8.me",
   "main": "index.js",
   "dependencies": {
     "correl8-cli": "^0.1.0",
     "express": "^4.14.0",
-    "moves": "^0.0.2",
-    "moves-api": "0.0.4",
-    "moves-date": "^0.1.2"
+    "moment": "^2.17.0",
+    "url": "^0.11.0",
+    "withings-oauth2": "0.0.9"
   },
   "devDependencies": {},
   "scripts": {

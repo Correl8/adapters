@@ -55,16 +55,16 @@ adapter.storeConfig = function(c8, result) {
 adapter.importData = function(c8, conf, opts) {
   if (conf.deviceId) {
     var client = new Bowline(conf);
-    client.fetch(function(err, response){
+    return client.fetch(function(err, response){
       if (err) {
         console.trace(err);
         return;
       }
-      response.id = response.time.timestamp;
+      response.id = response.time.timestamp + '-' + conf.deviceId;
       response.meta.sensor = conf.deviceId;
       response.timestamp = new Date(response.time.timestamp * 1000);
       console.log(response.timestamp);
-      c8.insert(response).then(function(result) {
+      return c8.insert(response).then(function(result) {
         // console.log(result);
         // console.log('Indexed ' + result.items.length + ' documents in ' + result.took + ' ms.');
       }).catch(function(error) {
