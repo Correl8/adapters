@@ -2,6 +2,7 @@ var fs = require('fs');
 var google = require('googleapis');
 var googleAuth = require('google-auth-library');
 var prompt = require('prompt');
+var activityTypes = require('google-fit-activity-types');
 
 var adapter = {};
 
@@ -21,16 +22,23 @@ adapter.types = [
     name: 'googlefit-dataset',
     fields: {
       'accuracy': 'float',
+      'activity': 'integer',
+      'activityName': 'string',
       'altitude': 'float',
       'bpm': 'float',
       'calories': 'float',
       'confidence': 'float',
+      'dataSourceId': 'string',
+      'dataSourceName': 'string',
+      'dataType': 'string',
       'distance': 'float',
+      'duration': 'integer',
       'grams': 'float',
       'height': 'float',
       'IU': 'float',
       'latitude': 'float',
       'longitude': 'float',
+      'originDataSourceId': 'string',
       'position': 'geo_point',
       'rpm': 'float',
       'resistance': 'float',
@@ -43,6 +51,7 @@ adapter.types = [
   {
     name: 'googlefit-session',
     fields: {
+      duration: 'integer',
       timestamp: 'date',
       position: 'geo_point'
     }
@@ -209,8 +218,11 @@ adapter.importData = function(c8, conf, opts) {
               var values = {}
               var id = resp.dataSourceId + ':' + dType.name + ':' + item.startTimeNanos;
               values.timestamp = new Date(item.startTimeNanos/1000000);
-              values.startTimeNanos = item.startTimeNanos;
-              values.endTimeNanos = item.endTimeNanos;
+              var st = parseInt(item.startTimeNanos);
+              var et = parseInt(item.endTimeNanos);
+              values.startTimeNanos = st;
+              values.endTimeNanos = et;
+              values.duration = parseInt((et - st)/1000000);
               values.dataSourceName = dsName;
               values.dataType = dType.name;
               // item.dataType = dType;
@@ -222,7 +234,13 @@ adapter.importData = function(c8, conf, opts) {
                    continue;
                 }
                 values[dType.field[k].name] = getValue(points[j].value[k]);
-                if (dType.field[k].name == 'latitude') {
+                if (dType.field[k].name == 'activity') {
+                  var activity = activityTypes[points[j].value[k].intVal];
+                  if (activity) {
+                    values['activityName'] = activity;
+                  }
+                }
+                else if (dType.field[k].name == 'latitude') {
                   ll[0] = points[j].value[k].fpVal;
                 }
                 else if (dType.field[k].name == 'longitude') {
@@ -253,8 +271,8 @@ adapter.importData = function(c8, conf, opts) {
             });
           }
           else {
-            var sd = new Date(resp.minStartTimeNs/1000);
-            var ed = new Date(resp.maxEndTimeNs/1000);
+            var sd = new Date(resp.minStartTimeNs/1000000);
+            var ed = new Date(resp.maxEndTimeNs/1000000);
             // console.log('No data between ' + sd.toISOString() + ' and ' + ed.toISOString());
           }
         });
