@@ -32,7 +32,9 @@ adapter.types = [
       'dataSourceName': 'string',
       'dataType': 'string',
       'distance': 'float',
-      'duration': 'integer',
+      'duration': 'float',
+      'endTime': 'date',
+      'endTimeNanos': 'integer',
       'grams': 'float',
       'height': 'float',
       'IU': 'float',
@@ -43,6 +45,9 @@ adapter.types = [
       'rpm': 'float',
       'resistance': 'float',
       'speed': 'float',
+      'startTime': 'date',
+      'startTimeNanos': 'integer',
+      'timestamp': 'date',
       'timestamp': 'date',
       'watts': 'float',
       'weight': 'float'
@@ -217,12 +222,14 @@ adapter.importData = function(c8, conf, opts) {
               var item = points[j];
               var values = {}
               var id = resp.dataSourceId + ':' + dType.name + ':' + item.startTimeNanos;
-              values.timestamp = new Date(item.startTimeNanos/1000000);
+              values.timestamp = new Date(item.startTimeNanos/1000000); // ms
               var st = parseInt(item.startTimeNanos);
               var et = parseInt(item.endTimeNanos);
               values.startTimeNanos = st;
               values.endTimeNanos = et;
-              values.duration = parseInt((et - st)/1000000);
+              values.startTime = parseInt(st/1000000); // ms
+              values.endTimeNanos = parseInt(et/1000000); // ms
+              values.duration = parseFloat((et - st)/1000000000); // fractions of seconds!
               values.dataSourceName = dsName;
               values.dataType = dType.name;
               // item.dataType = dType;
