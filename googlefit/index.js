@@ -31,10 +31,17 @@ adapter.types = [
       'dataSourceId': 'string',
       'dataSourceName': 'string',
       'dataType': 'string',
+       device: {
+         uid: 'string',
+         type: 'string',
+         version: 'string',
+         model: 'string',
+         manufacturer: 'string',
+      },
       'distance': 'float',
       'duration': 'float',
       'endTime': 'date',
-      'endTimeNanos': 'integer',
+      'endTimeNanos': 'long',
       'grams': 'float',
       'height': 'float',
       'IU': 'float',
@@ -46,7 +53,8 @@ adapter.types = [
       'resistance': 'float',
       'speed': 'float',
       'startTime': 'date',
-      'startTimeNanos': 'integer',
+      'startTimeNanos': 'long',
+      'steps': 'float',
       'timestamp': 'date',
       'timestamp': 'date',
       'watts': 'float',
@@ -227,8 +235,8 @@ adapter.importData = function(c8, conf, opts) {
               var et = parseInt(item.endTimeNanos);
               values.startTimeNanos = st;
               values.endTimeNanos = et;
-              values.startTime = parseInt(st/1000000); // ms
-              values.endTime = parseInt(et/1000000); // ms
+              values.startTime = new Date(parseInt(st/1000000)); // ms
+              values.endTime = new Date(parseInt(et/1000000)); // ms
               values.duration = parseFloat((et - st)/1000000000); // fractions of seconds!
               values.dataSourceName = dsName;
               values.dataType = dType.name;
@@ -236,8 +244,8 @@ adapter.importData = function(c8, conf, opts) {
               var ll = [];
               for (var k=0; k<dType.field.length; k++) {
                 if (!points[j].value[k]) {
-                   // console.warn('Undefined ' + dType.field[k].name);
-                   // console.log(points[j]);
+                   //console.warn('Undefined ' + dType.field[k].name);
+                   console.log(points[j]);
                    continue;
                 }
                 values[dType.field[k].name] = getValue(points[j].value[k]);
@@ -268,9 +276,13 @@ adapter.importData = function(c8, conf, opts) {
               bulk.push({index: {_index: c8._index, _type: c8._type, _id: id}});
               bulk.push(values);
             }
-            //  console.log(JSON.stringify(bulk, null, 2));
-            c8.bulk(bulk).then(function(result) {
-              console.log('Indexed ' + result.items.length + ' items in ' + result.took + ' ms.');
+            // console.log(JSON.stringify(bulk, null, 2));
+              c8.bulk(bulk).then(function(result) {
+		  if (result.errors) {
+		      console.trace(result.items);
+		  }
+		// console.log(result);
+		console.log('Indexed ' + result.items.length + ' items in ' + result.took + ' ms.');
               bulk = null;
             }).catch(function(error) {
               console.trace(error);
@@ -291,8 +303,32 @@ adapter.importData = function(c8, conf, opts) {
 };
 
 function getValue(obj) {
-  // what about string types?
-  return obj.intVal || obj.fpVal || obj.value;
+    // what about string types?
+    if (obj.stringVal || obj.stringVal === 0) {
+	return obj.stringVal;
+    }
+    if (obj.fpVal || obj.fpVal === 0) {
+	return obj.fpVal;
+    }
+    if (obj.intVal || obj.intVal === 0) {
+	return obj.intVal;
+    }
+    if (obj.mapVal) {
+	var values = [];
+	for (var i=0; i<obj.mapVal.length; i++) {
+	    var tmp = {};
+	    tmp[obj.mapVal[i].key] = obj.mapVal[i].value.fpVal;
+	    values.push(tmp);
+	}
+	if (values.length) {
+	    return values;
+	}
+    }
+    if (obj.value || obj.value === 0) {
+	return obj.value;
+    }
+	// console.trace(obj);
+    return null;
 }
 
 module.exports = adapter;
