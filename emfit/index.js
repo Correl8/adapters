@@ -44,7 +44,7 @@ adapter.importData = function(c8, conf, opts) {
     size: 1,
     sort: [{'timestamp': 'desc'}],
   }).then(function(response) {
-    console.log('Getting first date...');
+    // console.log('Getting first date...');
     return c8.search({
       _source: ['timestamp'],
       size: 1,
