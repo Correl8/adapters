@@ -229,7 +229,7 @@ adapter.importData = function(c8, conf, opts) {
             for (var j=0; j<points.length; j++) {
               var item = points[j];
               var values = {}
-              var id = resp.dataSourceId + ':' + dType.name + ':' + item.startTimeNanos;
+		var id = [item.startTimeNanos, resp.dataSourceId, dType.name].join('-');
               values.timestamp = new Date(item.startTimeNanos/1000000); // ms
               var st = parseInt(item.startTimeNanos);
               var et = parseInt(item.endTimeNanos);
@@ -279,7 +279,11 @@ adapter.importData = function(c8, conf, opts) {
             // console.log(JSON.stringify(bulk, null, 2));
               c8.bulk(bulk).then(function(result) {
 		  if (result.errors) {
-		      console.trace(result.items);
+		      for (var i=0; i<result.items; i++) {
+			  if (result.items[i].error) {
+			      console.trace(result.items[i]);
+			  }
+		      }
 		  }
 		// console.log(result);
 		console.log('Indexed ' + result.items.length + ' items in ' + result.took + ' ms.');
