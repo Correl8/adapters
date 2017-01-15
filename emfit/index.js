@@ -7,11 +7,18 @@ var adapter = {};
 
 adapter.sensorName = 'emfit-qs';
 
-var precenseIndex = 'emfit-qs';
+var precenseIndex = 'emfit-qs-presence';
+var trendIndex = 'emfit-qs-trend';
 
 adapter.types = [
   {
     name: precenseIndex,
+    fields: {
+      "timestamp": "date",
+    }
+  },
+  {
+    name: trendIndex,
     fields: {
       "timestamp": "date",
     }
@@ -79,13 +86,24 @@ function importData(c8, conf, firstDate, lastDate) {
   qs.login(conf.username, conf.password).then(function(data) {
     var deviceId = data.device_settings[0].device_id
     qs.latest(deviceId).then(function(latest) {
-      console.log(JSON.stringify(latest, null, 2))
+      latest.timestamp = new Date(latest.time_end * 1000);
+      return c8.type(precenseIndex).index(latest).then(function(result) {
+        console.log('Indexed ' + result.items.length + ' presence documents in ' + result.took + ' ms.');
+      }).catch(function(error) {
+        console.trace(error);
+      });
+    })
+    qs.trends(deviceId).then(function(trends) {
       var bulk = [];
-      // bulk.push({index: {_index: c8._index, _type: c8._type, _id: id}});
-      // bulk.push(obj[i]);
+      for (var i=0; i<trends.length; i++) {
+        var id = trends[i].date;
+        trends[i].timestamp = new Date(trends[i].date);
+        bulk.push({index: {_index: c8.type(trendIndex)._index, _type: c8._type, _id: id}});
+        bulk.push(trends[i]);
+      }
       if (bulk.length > 0) {
         return c8.bulk(bulk).then(function(result) {
-          console.log('Indexed ' + result.items.length + ' documents in ' + result.took + ' ms.');
+          console.log('Indexed ' + result.items.length + ' trend documents in ' + result.took + ' ms.');
         }).catch(function(error) {
           console.trace(error);
         });
