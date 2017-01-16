@@ -6,7 +6,7 @@
   "dependencies": {
     "correl8-cli": "^0.1.0",
     "express": "^4.14.0",
-    "emfit-qs": "^0.2.0"
+    "emfit-qs": "^0.3.0"
   },
   "devDependencies": {},
   "scripts": {
