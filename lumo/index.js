@@ -23,7 +23,7 @@ adapter.types = [
       "dataSource": "string",
       "dataType": "string",
       "value": "integer",
-      "upluadTime": "date",
+      "uploadTime": "date",
       "badPostureDuration": "integer",
       "goodPostureDuration": "integer",
       "totalCalories": "integer",
