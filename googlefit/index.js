@@ -22,8 +22,8 @@ adapter.types = [
     name: 'googlefit-dataset',
     fields: {
       'accuracy': 'float',
-      'activity': 'integer',
-      'activityName': 'string',
+      'activityId': 'integer',
+      'activity': 'string',
       'altitude': 'float',
       'bpm': 'float',
       'calories': 'float',
@@ -229,7 +229,7 @@ adapter.importData = function(c8, conf, opts) {
             for (var j=0; j<points.length; j++) {
               var item = points[j];
               var values = {}
-		var id = [item.startTimeNanos, resp.dataSourceId, dType.name].join('-');
+              var id = [item.startTimeNanos, resp.dataSourceId, dType.name].join('-');
               values.timestamp = new Date(item.startTimeNanos/1000000); // ms
               var st = parseInt(item.startTimeNanos);
               var et = parseInt(item.endTimeNanos);
@@ -243,16 +243,17 @@ adapter.importData = function(c8, conf, opts) {
               // item.dataType = dType;
               var ll = [];
               for (var k=0; k<dType.field.length; k++) {
-                if (!points[j].value[k]) {
-                   //console.warn('Undefined ' + dType.field[k].name);
-                   console.log(points[j]);
+                if (!points[j].value[k] && points[j].value[k] !== 0) {
+                   // console.warn(k + ': Undefined ' + dType.field[k].name + ': ' + points[j].value[k]);
+                   // console.log(points[j]);
                    continue;
                 }
                 values[dType.field[k].name] = getValue(points[j].value[k]);
                 if (dType.field[k].name == 'activity') {
+                  values['activityId'] = points[j].value[k].intVal;
                   var activity = activityTypes[points[j].value[k].intVal];
                   if (activity) {
-                    values['activityName'] = activity;
+                    values['activity'] = activity;
                   }
                 }
                 else if (dType.field[k].name == 'latitude') {
