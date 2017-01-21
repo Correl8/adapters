@@ -6,6 +6,7 @@ adapter.sensorName = 'twine';
 
 adapter.types = [
   {
+    id: 'string',
     name: 'twine',
     fields: {
       timestamp: 'date',
@@ -14,7 +15,7 @@ adapter.types = [
         battery: 'string',
         wifiSignal: 'string'
       },
-      time: {
+      measureTime: {
         age: 'float',
         timestamp: 'integer'
       },
@@ -63,6 +64,8 @@ adapter.importData = function(c8, conf, opts) {
       response.id = response.time.timestamp + '-' + conf.deviceId;
       response.meta.sensor = conf.deviceId;
       response.timestamp = new Date(response.time.timestamp * 1000);
+      response.measureTime = response.time;
+      delete(response.time);
       console.log(response.timestamp);
       return c8.insert(response).then(function(result) {
         // console.log(result);
