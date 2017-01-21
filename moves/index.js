@@ -22,6 +22,7 @@ adapter.types = [
     name: summaryType,
     fields: {
       timestamp: 'date',
+      id: 'string',
       summary: {
         activity: 'string',
         group: 'string',
@@ -316,7 +317,7 @@ function splitToBulk(c8, document) {
       }
       else {
         c8.type(moveType);
-        seg.id = seg.timestamp + '-' + seg.activity;
+        seg.id = seg.timestamp + '-' + (seg.activity || seg.type);
       }
       // console.log(JSON.stringify(seg));
       bulk.push({index: {_index: c8._index, _type: c8._type, _id: seg.id}});
