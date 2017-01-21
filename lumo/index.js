@@ -5,7 +5,7 @@ var lumolift = require('lumolift'),
 
 var redirectUri = 'http://localhost:5866/authcallback';
 
-var MAX_DAYS = 30;
+var MAX_DAYS = 7;
 var MS_IN_DAY = 24 * 60 * 60 * 1000;
 
 var adapter = {};
@@ -156,10 +156,12 @@ function importData(c8, conf, firstDate, lastDate) {
       var start = Math.floor(firstDate.getTime()/1000);
       var end = Math.ceil(lastDate.getTime()/1000);
       client.activities(start, end).then(function (response) {
+        // console.log(JSON.stringify(response, null, 1));
         var bulk = [];
         var obj = response.data;
         var index = postureIndex;
         for (var i=0; i<obj.length; i++) {
+          // console.log(JSON.stringify(obj[i]) + ' (' + i + ')');
           obj[i].localTime = obj[i].localTime * 1000;
           obj[i].uploadTime = obj[i].uploadTime * 1000;
           // local time will be handled as if it was UTC
@@ -190,6 +192,9 @@ function importData(c8, conf, firstDate, lastDate) {
           else if (type == 'TIME_WALKING') {
             obj[i].walkingDuration = obj[i].value;
           }
+          else if (type == 'TIME_RUNNING') {
+            obj[i].runningDuration = obj[i].value;
+          }
           else if (type == 'RUNNING_CALORIES') {
             obj[i].runningCalories = obj[i].value;
           }
@@ -198,6 +203,10 @@ function importData(c8, conf, firstDate, lastDate) {
           }
           else if (type == 'TIME_IN_BAD_POSTURE') {
             obj[i].badPostureDuration = obj[i].value;
+          }
+          else {
+            console.error('Unknown type:' + JSON.stringify(obj[i], null, 2));
+            continue;
           }
           var id = ts.toISOString() + '-' + obj[i].dataSource + '-' + type;
           console.log(id + ': ' + obj[i].value);
