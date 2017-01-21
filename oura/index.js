@@ -128,7 +128,7 @@ adapter.types = [
     fields: {
       "timestamp": "date",
       "duration": "integer",
-      "type": "integer",
+      "state_id": "integer",
       "state": "string"
     }
   },
@@ -145,7 +145,7 @@ adapter.types = [
     fields: {
       "timestamp": "date",
       "duration": "integer",
-      "type": "integer",
+      "activity_id": "integer",
       "class": "string"
     }
   },
@@ -154,7 +154,7 @@ adapter.types = [
     fields: {
       "timestamp": "date",
       "duration": "integer",
-      "moveType": "integer"
+      "met": "float"
     }
   },
 ];
@@ -296,7 +296,7 @@ function importData(c8, conf, firstDate, lastDate) {
                 continue;
               }
               bulk.push({index: {_index: c8.type(sleepHRIndex)._index, _type: c8._type, _id: d.format()}});
-                bulk.push({timestamp: d.format(), duration: duration, HR: sleepHRData[j]});
+                bulk.push({timestamp: d.format(), duration: duration, hr: sleepHRData[j]});
             }
           }
           if (sleepStateData && sleepStateData.length) {
@@ -305,7 +305,7 @@ function importData(c8, conf, firstDate, lastDate) {
             for (var j=0; j<sleepStateData.length; j++) {
               d.add(5, 'minutes');
               bulk.push({index: {_index: c8.type(sleepStateIndex)._index, _type: c8._type, _id: d.format()}});
-              bulk.push({timestamp: d.format(), duration: duration, type: sleepStateData[j], state: sleepStates[sleepStateData[j]]});
+              bulk.push({timestamp: d.format(), duration: duration, state_id: sleepStateData[j], state: sleepStates[sleepStateData[j]]});
             }
           }
         }
@@ -348,7 +348,7 @@ function importData(c8, conf, firstDate, lastDate) {
             for (var j=0; j<activityClassData.length; j++) {
               d.add(5, 'minutes');
               bulk.push({index: {_index: c8.type(activityClassIndex)._index, _type: c8._type, _id: d.format()}});
-              bulk.push({timestamp: d.format(), duration: duration, type: activityClassData[j], "class": activityClasses[activityClassData[j]]});
+              bulk.push({timestamp: d.format(), duration: duration, activity_id: activityClassData[j], "class": activityClasses[activityClassData[j]]});
             }
           }
         }
