@@ -35,9 +35,18 @@ adapter.types = [
     name: indexName,
     fields: {
       "timestamp": "date",
+      measures: {
+        "value": "float",
+        "type": "integer",
+        "unit": "integer",
+      }
     }
   }
 ];
+for (var i=1; i<measTypes.length; i++) {
+  if (!measTypes[i]) continue;
+  adapter.types[0].fields[measTypes[i].name] = 'float';
+}
 
 adapter.promptProps = {
   properties: {
@@ -108,81 +117,90 @@ adapter.storeConfig = function(c8, result) {
 };
 
 adapter.importData = function(c8, conf, opts) {
-  c8.type(indexName).search({
-    _source: ['timestamp'],
-    size: 1,
-    sort: [{'timestamp': 'desc'}],
-  }).then(function(response) {
-    console.log('Getting first date...');
-    return c8.search({
+  return new Promise(function (fulfill, reject){
+    c8.type(indexName).search({
       _source: ['timestamp'],
       size: 1,
       sort: [{'timestamp': 'desc'}],
     }).then(function(response) {
-      var resp = c8.trimResults(response);
-      var firstDate = new Date();
-      var lastDate = opts.lastDate || new Date();
-      firstDate.setTime(lastDate.getTime() - (MAX_DAYS * MS_IN_DAY));
-      if (opts.firstDate) {
-        firstDate = new Date(opts.firstDate);
-        console.log('Setting first time to ' + firstDate);
-      }
-      else if (resp && resp.timestamp) {
-        var d = new Date(resp.timestamp);
-        firstDate.setTime(d.getTime() + 1);
-        console.log('Setting first time to ' + firstDate);
-      }
-      if (lastDate.getTime() > (firstDate.getTime() + MAX_DAYS * MS_IN_DAY)) {
-        lastDate.setTime(firstDate.getTime() + MAX_DAYS * MS_IN_DAY);
-        console.warn('Setting last date to ' + lastDate);
-      }
-      importData(c8, conf, firstDate, lastDate);
+      // console.log('Getting first date...');
+      c8.search({
+        _source: ['timestamp'],
+        size: 1,
+        sort: [{'timestamp': 'desc'}],
+      }).then(function(response) {
+        var resp = c8.trimResults(response);
+        var firstDate = new Date();
+        var lastDate = opts.lastDate || new Date();
+        firstDate.setTime(lastDate.getTime() - (MAX_DAYS * MS_IN_DAY));
+        if (opts.firstDate) {
+          firstDate = new Date(opts.firstDate);
+          console.log('Setting first time to ' + firstDate);
+        }
+        else if (resp && resp.timestamp) {
+          var d = new Date(resp.timestamp);
+          firstDate.setTime(d.getTime() + 1);
+          console.log('Setting first time to ' + firstDate);
+        }
+        if (lastDate.getTime() > (firstDate.getTime() + MAX_DAYS * MS_IN_DAY)) {
+          lastDate.setTime(firstDate.getTime() + MAX_DAYS * MS_IN_DAY);
+          console.warn('Setting last date to ' + lastDate);
+        }
+        importData(c8, conf, firstDate, lastDate).then(function(message) {
+          fulfill(message);
+        });
+      });
+    }).catch(function(error) {
+      reject(error);
     });
-  }).catch(function(error) {
-    console.trace(error);
   });
 }
 
 function importData(c8, conf, firstDate, lastDate) {
-  var client = new Withings(conf);
-  client.getMeasuresAsync(null, firstDate, lastDate).then(function(data) {
-    var bulk = [];
-    var obj = data.body.measuregrps;
-    for (var i=0; i<obj.length; i++) {
-      var meta = {
-        date: obj[i].date,
-        cat: (obj[i].category === 2 ? 'objective' : 'real')
-      }
-      for (var j=0; j<obj[i].measures.length; j++) {
-        var t = obj[i].measures[j].type;
-        var v = obj[i].measures[j].value;
-        var u = obj[i].measures[j].unit;
+  return new Promise(function (fulfill, reject){
+    var client = new Withings(conf);
+    client.getMeasuresAsync(null, firstDate, lastDate).then(function(data) {
+      var bulk = [];
+      var obj = data.body.measuregrps;
+      for (var i=0; i<obj.length; i++) {
+        var meta = {
+          date: obj[i].date,
+          cat: (obj[i].category === 2 ? 'objective' : 'real')
+        }
+        // console.log(JSON.stringify(obj[i]));
         var values = {
           timestamp: meta.date * 1000,
           category: meta.cat,
-          standardValue: v,
-          factor: u,
-          unit: measTypes[t].unit
+          measures: obj[i].measures
         }
-        var realValue = v * Math.pow(10, u);
-        values[measTypes[t].name] = realValue;
-        var id = meta.date + '-' + t;
-        var d = new Date(meta.date * 1000);
-        console.log(d + ': ' + measTypes[t].name + ' = ' + realValue);
+        var id = meta.date + '-' + meta.cat;
+        for (var j=0; j<obj[i].measures.length; j++) {
+          var t = obj[i].measures[j].type;
+          var v = obj[i].measures[j].value;
+          var u = obj[i].measures[j].unit;
+          var realValue = v * Math.pow(10, u);
+          values[measTypes[t].name] = realValue;
+          var d = new Date(meta.date * 1000);
+          // console.log(d + ': ' + measTypes[t].name + ' = ' + realValue);
+        }
         bulk.push({index: {_index: c8._index, _type: c8._type, _id: id}});
         bulk.push(values);
+        // console.log(values);
       }
-    }
-    if (bulk.length > 0) {
-      return c8.bulk(bulk).then(function(result) {
-        console.log('Indexed ' + result.items.length + ' documents in ' + result.took + ' ms.');
-      }).catch(function(error) {
-        console.trace(error);
-      });
-    }
-  }).catch(function(error){
-    console.error(error)
-  })
+      if (bulk.length > 0) {
+        c8.bulk(bulk).then(function(result) {
+          fulfill('Indexed ' + result.items.length + ' documents in ' + result.took + ' ms.');
+        }).catch(function(error) {
+          reject(error);
+        });
+      }
+      else {
+        fulfill('No data available for import.');
+      }
+    }).catch(function(error){
+      reject(error);
+    });
+  });
 }
 
 module.exports = adapter;

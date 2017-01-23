@@ -94,62 +94,64 @@ adapter.storeConfig = function(c8, result) {
 }
 
 adapter.importData = function(c8, conf, opts) {
-  var clientSecret = conf.installed.client_secret;
-  var clientId = conf.installed.client_id;
-  var redirectUrl = conf.installed.redirect_uris[0];
-  var auth = new googleAuth();
-  var oauth2Client = new auth.OAuth2(clientId, clientSecret, redirectUrl);
-  oauth2Client.credentials = conf.credentials;
-  var sheets = google.sheets('v4');
-  var getParams = {
-    auth: oauth2Client,
-    spreadsheetId: conf.sheetID,
-    valueRenderOption: 'UNFORMATTED_VALUE',
-    dateTimeRenderOption: 'FORMATTED_STRING'
-  };
-  if (conf.range) {
-    getParams.range = conf.range;
-  }
-  sheets.spreadsheets.values.get(getParams, function(err, response) {
-    if (err) {
-      console.log('The API returned an error: ' + err);
-      return;
+  return new Promise(function (fulfill, reject){
+    var clientSecret = conf.installed.client_secret;
+    var clientId = conf.installed.client_id;
+    var redirectUrl = conf.installed.redirect_uris[0];
+    var auth = new googleAuth();
+    var oauth2Client = new auth.OAuth2(clientId, clientSecret, redirectUrl);
+    oauth2Client.credentials = conf.credentials;
+    var sheets = google.sheets('v4');
+    var getParams = {
+      auth: oauth2Client,
+      spreadsheetId: conf.sheetID,
+      valueRenderOption: 'UNFORMATTED_VALUE',
+      dateTimeRenderOption: 'FORMATTED_STRING'
+    };
+    if (conf.range) {
+      getParams.range = conf.range;
     }
-    var rows = response.values;
-    if (rows.length == 0) {
-      console.log('No data found.');
-    } else {
-      console.log('Found ' + rows.length + ' rows:');
-      var bulk = [];
-      for (var i = 0; i < rows.length; i++) {
-        var row = rows[i];
-        var timeArray = row[0].split('.');
-          var ts = new Date(timeArray[2], parseInt(timeArray[1])-1 , timeArray[0]);
-        if (!row[1] && !row[2]) {
-          break;
-        }
-        var values = {
-          timestamp: ts,
-          date: ts,
-          consumptionEnergyDay: Math.round(row[4]*100)/100,
-          consumptionEnergyNight: Math.round(row[5]*100)/100,
-          consumptionEnergyTotal: Math.round(row[6]*100)/100,
-          days: row[3]
-        }
-	  console.log(row[0]);
-          console.log(ts + ': ' + Math.round(row[6]*100)/100 + ' kWh');
-        bulk.push({index: {_index: c8._index, _type: c8._type, _id: ts}});
-        bulk.push(values);
+    sheets.spreadsheets.values.get(getParams, function(err, response) {
+      if (err) {
+        reject('The API returned an error: ' + err);
+        return;
       }
-      // console.log(bulk);
-      return c8.bulk(bulk).then(function(result) {
-        console.log('Indexed ' + result.items.length + ' rows in ' + result.took + ' ms.');
-        bulk = null;
-      }).catch(function(error) {
-        console.trace(error);
-        bulk = null;
-      });
-    }
+      var rows = response.values;
+      if (rows.length == 0) {
+        console.log('No data found.');
+      } else {
+        console.log('Found ' + rows.length + ' rows:');
+        var bulk = [];
+        for (var i = 0; i < rows.length; i++) {
+          var row = rows[i];
+          var timeArray = row[0].split('.');
+            var ts = new Date(timeArray[2], parseInt(timeArray[1])-1 , timeArray[0]);
+          if (!row[1] && !row[2]) {
+            break;
+          }
+          var values = {
+            timestamp: ts,
+            date: ts,
+            consumptionEnergyDay: Math.round(row[4]*100)/100,
+            consumptionEnergyNight: Math.round(row[5]*100)/100,
+            consumptionEnergyTotal: Math.round(row[6]*100)/100,
+            days: row[3]
+          }
+  	  // console.log(row[0]);
+          console.log(ts + ': ' + Math.round(row[6]*100)/100 + ' kWh');
+          bulk.push({index: {_index: c8._index, _type: c8._type, _id: ts}});
+          bulk.push(values);
+        }
+        // console.log(bulk);
+        c8.bulk(bulk).then(function(result) {
+          fulfill('Indexed ' + result.items.length + ' rows in ' + result.took + ' ms.');
+          bulk = null;
+        }).catch(function(error) {
+          reject(error);
+          bulk = null;
+        });
+      }
+    });
   });
 };
 

@@ -121,17 +121,17 @@ adapter.importData = function(c8, conf, opts) {
 
 */
 
-  c8.type(eventIndex).search({
-    _source: ['timestamp'],
-    size: 1,
-    sort: [{'timestamp': 'desc'}],
-  }).then(function(response) {
-    return c8.search({
+  return new Promise(function (fulfill, reject){
+    c8.type(eventIndex).search({
       _source: ['timestamp'],
       size: 1,
       sort: [{'timestamp': 'desc'}],
     }).then(function(response) {
-      return new Promise(function (fulfill, reject){
+      c8.search({
+        _source: ['timestamp'],
+        size: 1,
+        sort: [{'timestamp': 'desc'}],
+      }).then(function(response) {
         var resp = c8.trimResults(response);
         var firstDate;
         if (opts.firstDate) {
@@ -202,14 +202,14 @@ adapter.importData = function(c8, conf, opts) {
                 bulk.push(obj);
               }
               if (bulk.length > 0) {
-                return c8.bulk(bulk).then(function(result) {
+                c8.bulk(bulk).then(function(result) {
                   console.log('Indexed ' + result.items.length + ' events in ' + result.took + ' ms.');
                 }).catch(function(error) {
-                  console.trace(error);
+                  reject(error);
                 });
               }
               else {
-                console.log('No events');
+                fulfill('No events');
               }
             });
             date.setTime(date.getTime() + MS_IN_DAY);
@@ -218,8 +218,7 @@ adapter.importData = function(c8, conf, opts) {
 
           if (streakBulk.length > 0) {
             c8.bulk(streakBulk).then(function(result) {
-              console.log('Indexed ' + result.items.length + ' streak documents in ' + result.took + ' ms.');
-              fulfill(result);
+              fulfill('Indexed ' + result.items.length + ' streak documents in ' + result.took + ' ms.');
             }).catch(function(error) {
               reject(error);
             });
@@ -227,11 +226,10 @@ adapter.importData = function(c8, conf, opts) {
         });
 
       });
+    }).catch(function(error) {
+      console.trace(error);
     });
-  }).catch(function(error) {
-    console.trace(error);
   });
-
 };
 
 module.exports = adapter;

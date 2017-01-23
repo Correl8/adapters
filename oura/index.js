@@ -219,180 +219,210 @@ adapter.storeConfig = function(c8, result) {
 };
 
 adapter.importData = function(c8, conf, opts) {
-  c8.type(sleepSummaryIndex).search({
-    _source: ['timestamp'],
-    size: 1,
-    sort: [{'timestamp': 'desc'}],
-  }).then(function(response) {
-    console.log('Getting first date...');
-    return c8.search({
+  return new Promise(function (fulfill, reject){
+    c8.type(sleepSummaryIndex).search({
       _source: ['timestamp'],
       size: 1,
       sort: [{'timestamp': 'desc'}],
     }).then(function(response) {
-      var resp = c8.trimResults(response);
-      var firstDate = new Date();
-      var lastDate = opts.lastDate || new Date();
-      firstDate.setTime(lastDate.getTime() - (MAX_DAYS * MS_IN_DAY));
-      if (opts.firstDate) {
-        firstDate = new Date(opts.firstDate);
-        console.log('Setting first time to ' + firstDate);
-      }
-      else if (resp && resp.timestamp) {
-        var d = new Date(resp.timestamp);
-        firstDate.setTime(d.getTime() + 1);
-        console.log('Setting first time to ' + firstDate);
-      }
-      if (lastDate.getTime() > (firstDate.getTime() + MAX_DAYS * MS_IN_DAY)) {
-        lastDate.setTime(firstDate.getTime() + MAX_DAYS * MS_IN_DAY);
-        console.warn('Setting last date to ' + lastDate);
-      }
-      importData(c8, conf, firstDate, lastDate);
+      console.log('Getting first date...');
+      c8.search({
+        _source: ['timestamp'],
+        size: 1,
+        sort: [{'timestamp': 'desc'}],
+      }).then(function(response) {
+        var resp = c8.trimResults(response);
+        var firstDate = new Date();
+        var lastDate = opts.lastDate || new Date();
+        firstDate.setTime(lastDate.getTime() - (MAX_DAYS * MS_IN_DAY));
+        if (opts.firstDate) {
+          firstDate = new Date(opts.firstDate);
+          console.log('Setting first time to ' + firstDate);
+        }
+        else if (resp && resp.timestamp) {
+          var d = new Date(resp.timestamp);
+          firstDate.setTime(d.getTime() + 1);
+          console.log('Setting first time to ' + firstDate);
+        }
+        if (lastDate.getTime() > (firstDate.getTime() + MAX_DAYS * MS_IN_DAY)) {
+          lastDate.setTime(firstDate.getTime() + MAX_DAYS * MS_IN_DAY);
+          console.warn('Setting last date to ' + lastDate);
+        }
+        importData(c8, conf, firstDate, lastDate).then(function(message) {
+          fulfill(message);
+        }).catch(function(error) {
+          reject(error);
+        });
+      });
+    }).catch(function(error) {
+      reject(error);
     });
-  }).catch(function(error) {
-    console.trace(error);
   });
 }
 
 function importData(c8, conf, firstDate, lastDate) {
-  var options = {
-    clientId: conf.client_id,
-    clientSecret: conf.client_secret,
-    redirectUri: conf.redirect_uri
-  };
-  var token = conf.access_token;
-  var authClient = oura.Auth(options);
-  var auth = authClient.createToken(conf.access_token, conf.refresh_token);
-  auth.refresh().then(function(refreshed) {
-    Object.assign(conf, refreshed.data);
-    return c8.config(conf).then(function(){
-      var client = new oura.Client(conf.access_token);
-      if (!firstDate) {
-        console.warn('No starting date...');
-        return;
-      }
-      var start = moment(firstDate).format(dateFormat);
-      var end = moment(lastDate).format(dateFormat);
-      client.sleep(start, end).then(function (response) {
-        var bulk = [];
-        var obj = response.sleep;
-        for (var i=0; i<obj.length; i++) {
-          // var summaryDate = obj[i].summary_date;
-          var summaryDate = moment(obj[i].bedtime_end).format('YYYY-MM-DD');
-          console.log(summaryDate);
-          var sleepStateData = obj[i].hypnogram_5min.split("");
-          var sleepHRData = obj[i].hr_10min;
-          obj[i].timestamp = summaryDate;
-          var id = summaryDate + obj[i].period_id;
-          bulk.push({index: {_index: c8.type(sleepSummaryIndex)._index, _type: c8._type, _id: id}});
-          bulk.push(obj[i]);
-          if (sleepHRData && sleepHRData.length) {
-            var d = moment(obj[i].bedtime_start);
-            var duration = 10 * 60; // seconds
-            for (var j=0; j<sleepHRData.length; j++) {
-              d.add(10, 'minutes');
-              if (sleepHRData[j] == 255) {
-                // ignore value, it's likely faulty
-                continue;
-              }
-              bulk.push({index: {_index: c8.type(sleepHRIndex)._index, _type: c8._type, _id: d.format()}});
-                bulk.push({timestamp: d.format(), duration: duration, hr: sleepHRData[j]});
-            }
-          }
-          if (sleepStateData && sleepStateData.length) {
-            var d = moment(obj[i].bedtime_start);
-            var duration = 5 * 60; // seconds
-            for (var j=0; j<sleepStateData.length; j++) {
-              d.add(5, 'minutes');
-              bulk.push({index: {_index: c8.type(sleepStateIndex)._index, _type: c8._type, _id: d.format()}});
-              bulk.push({timestamp: d.format(), duration: duration, state_id: sleepStateData[j], state: sleepStates[sleepStateData[j]]});
-            }
-          }
+  return new Promise(function (fulfill, reject){
+    var options = {
+      clientId: conf.client_id,
+      clientSecret: conf.client_secret,
+      redirectUri: conf.redirect_uri
+    };
+    var token = conf.access_token;
+    var authClient = oura.Auth(options);
+    var auth = authClient.createToken(conf.access_token, conf.refresh_token);
+    auth.refresh().then(function(refreshed) {
+      Object.assign(conf, refreshed.data);
+      c8.config(conf).then(function(){
+        var client = new oura.Client(conf.access_token);
+        if (!firstDate) {
+          reject('No starting date...');
+          return;
         }
-        if (bulk.length > 0) {
-          c8.bulk(bulk).then(function(result) {
-            console.log('Indexed ' + result.items.length + ' sleep documents in ' + result.took + ' ms.');
-          }).catch(function(error) {
-            console.trace(error);
-          });
-        }
-        else {
-          console.log('No sleep to import');
-        }
+        var start = moment(firstDate).format(dateFormat);
+        var end = moment(lastDate).format(dateFormat);
+        Promise.all([
+          getSleep(c8, client, start, end),
+          getActivity(c8, client, start, end),
+          getReadiness(c8, client, start, end),
+        ]).then(function(values){
+            fulfill(values.join('\n'));
+        });
       }).catch(function(error){
-        console.error(error)
-      })
-      client.activity(start, end).then(function (response) {
-        var bulk = [];
-        var obj = response.activity;
-        for (var i=0; i<obj.length; i++) {
-          var summaryDate = obj[i].summary_date;
-          console.log(summaryDate);
-          var activityClassData = obj[i].class_5min.split("");
-          var activityMETData = obj[i].met_1min;
-          var id = obj[i].timestamp = summaryDate;
-          bulk.push({index: {_index: c8.type(activitySummaryIndex)._index, _type: c8._type, _id: id}});
-          bulk.push(obj[i]);
-          if (activityMETData && activityMETData.length) {
-            var d = moment(summaryDate).hour(4).minute(0).second(0).millisecond(0);
-            var duration = 60; // seconds
-            for (var j=0; j<activityMETData.length; j++) {
-              d.add(1, 'minutes');
-              bulk.push({index: {_index: c8.type(activityMETIndex)._index, _type: c8._type, _id: d.format()}});
-              bulk.push({timestamp: d.format(), duration: duration, met: activityMETData[j]});
-            }
-          }
-          if (activityClassData && activityClassData.length) {
-            var d = moment(summaryDate).hour(4).minute(0).second(0).millisecond(0);
-            var duration = 5 * 60; // seconds
-            for (var j=0; j<activityClassData.length; j++) {
-              d.add(5, 'minutes');
-              bulk.push({index: {_index: c8.type(activityClassIndex)._index, _type: c8._type, _id: d.format()}});
-              bulk.push({timestamp: d.format(), duration: duration, activity_id: activityClassData[j], "class": activityClasses[activityClassData[j]]});
-            }
-          }
-        }
-        if (bulk.length > 0) {
-          c8.bulk(bulk).then(function(result) {
-            console.log('Indexed ' + result.items.length + ' activity documents in ' + result.took + ' ms.');
-          }).catch(function(error) {
-            console.trace(error);
-          });
-        }
-        else {
-          console.log('No activity to import');
-        }
-      }).catch(function(error){
-        console.error(error)
-      })
-      client.readiness(start, end).then(function (response) {
-        var bulk = [];
-        var obj = response.readiness;
-        for (var i=0; i<obj.length; i++) {
-          var summaryDate = obj[i].summary_date;
-          console.log(summaryDate);
-          var id = obj[i].timestamp = summaryDate;
-          bulk.push({index: {_index: c8.type(readinessSummaryIndex)._index, _type: c8._type, _id: id}});
-          bulk.push(obj[i]);
-        }
-        if (bulk.length > 0) {
-          c8.bulk(bulk).then(function(result) {
-            console.log('Indexed ' + result.items.length + ' readiness documents in ' + result.took + ' ms.');
-          }).catch(function(error) {
-            console.trace(error);
-          });
-        }
-        else {
-          console.log('No readiness data to import');
-        }
-      }).catch(function(error){
-        console.error(error)
+        reject(error)
       });
     }).catch(function(error){
-      console.error(error)
+      reject(error)
     });
-  }).catch(function(error){
-    console.error(error)
+  });
+}
+
+function getSleep(c8, client, start, end) {
+  return new Promise(function (fulfill, reject){
+    client.sleep(start, end).then(function (response) {
+      var bulk = [];
+      var obj = response.sleep;
+      for (var i=0; i<obj.length; i++) {
+        // var summaryDate = obj[i].summary_date;
+        var summaryDate = moment(obj[i].bedtime_end).format('YYYY-MM-DD');
+        console.log(summaryDate);
+        var sleepStateData = obj[i].hypnogram_5min.split("");
+        var sleepHRData = obj[i].hr_10min;
+        obj[i].timestamp = summaryDate;
+        var id = summaryDate + obj[i].period_id;
+        bulk.push({index: {_index: c8.type(sleepSummaryIndex)._index, _type: c8._type, _id: id}});
+        bulk.push(obj[i]);
+        if (sleepHRData && sleepHRData.length) {
+          var d = moment(obj[i].bedtime_start);
+          var duration = 10 * 60; // seconds
+          for (var j=0; j<sleepHRData.length; j++) {
+            d.add(10, 'minutes');
+            if (sleepHRData[j] == 255) {
+              // ignore value, it's likely faulty
+              continue;
+            }
+            bulk.push({index: {_index: c8.type(sleepHRIndex)._index, _type: c8._type, _id: d.format()}});
+              bulk.push({timestamp: d.format(), duration: duration, hr: sleepHRData[j]});
+          }
+        }
+        if (sleepStateData && sleepStateData.length) {
+          var d = moment(obj[i].bedtime_start);
+          var duration = 5 * 60; // seconds
+          for (var j=0; j<sleepStateData.length; j++) {
+            d.add(5, 'minutes');
+            bulk.push({index: {_index: c8.type(sleepStateIndex)._index, _type: c8._type, _id: d.format()}});
+            bulk.push({timestamp: d.format(), duration: duration, state_id: sleepStateData[j], state: sleepStates[sleepStateData[j]]});
+          }
+        }
+      }
+      if (bulk.length > 0) {
+        c8.bulk(bulk).then(function(result) {
+          fulfill('Indexed ' + result.items.length + ' sleep documents in ' + result.took + ' ms.');
+        }).catch(function(error) {
+          reject(error);
+        });
+      }
+      else {
+        fulfill('No sleep to import');
+      }
+    }).catch(function(error){
+      reject(error)
+    });
+  });
+}
+
+function getActivity(c8, client, start, end) {
+  return new Promise(function (fulfill, reject){
+    client.activity(start, end).then(function (response) {
+      var bulk = [];
+      var obj = response.activity;
+      for (var i=0; i<obj.length; i++) {
+        var summaryDate = obj[i].summary_date;
+        console.log(summaryDate);
+        var activityClassData = obj[i].class_5min.split("");
+        var activityMETData = obj[i].met_1min;
+        var id = obj[i].timestamp = summaryDate;
+        bulk.push({index: {_index: c8.type(activitySummaryIndex)._index, _type: c8._type, _id: id}});
+        bulk.push(obj[i]);
+        if (activityMETData && activityMETData.length) {
+          var d = moment(summaryDate).hour(4).minute(0).second(0).millisecond(0);
+          var duration = 60; // seconds
+          for (var j=0; j<activityMETData.length; j++) {
+            d.add(1, 'minutes');
+            bulk.push({index: {_index: c8.type(activityMETIndex)._index, _type: c8._type, _id: d.format()}});
+            bulk.push({timestamp: d.format(), duration: duration, met: activityMETData[j]});
+          }
+        }
+        if (activityClassData && activityClassData.length) {
+          var d = moment(summaryDate).hour(4).minute(0).second(0).millisecond(0);
+          var duration = 5 * 60; // seconds
+          for (var j=0; j<activityClassData.length; j++) {
+            d.add(5, 'minutes');
+            bulk.push({index: {_index: c8.type(activityClassIndex)._index, _type: c8._type, _id: d.format()}});
+            bulk.push({timestamp: d.format(), duration: duration, activity_id: activityClassData[j], "class": activityClasses[activityClassData[j]]});
+          }
+        }
+      }
+      if (bulk.length > 0) {
+        c8.bulk(bulk).then(function(result) {
+          fulfill('Indexed ' + result.items.length + ' activity documents in ' + result.took + ' ms.');
+        }).catch(function(error) {
+          reject(error);
+        });
+      }
+      else {
+        fulfill('No activity to import');
+      }
+    }).catch(function(error) {
+      reject(error);
+    });
+  });
+}
+
+function getReadiness(c8, client, start, end) {
+  return new Promise(function (fulfill, reject){
+    client.readiness(start, end).then(function (response) {
+      var bulk = [];
+      var obj = response.readiness;
+      for (var i=0; i<obj.length; i++) {
+        var summaryDate = obj[i].summary_date;
+        console.log(summaryDate);
+        var id = obj[i].timestamp = summaryDate;
+        bulk.push({index: {_index: c8.type(readinessSummaryIndex)._index, _type: c8._type, _id: id}});
+        bulk.push(obj[i]);
+      }
+      if (bulk.length > 0) {
+        c8.bulk(bulk).then(function(result) {
+          fulfill('Indexed ' + result.items.length + ' readiness documents in ' + result.took + ' ms.');
+        }).catch(function(error) {
+          reject(error);
+        });
+      }
+      else {
+        fulfill('No readiness data to import');
+      }
+    }).catch(function(error){
+      reject(error)
+    });
   });
 }
 

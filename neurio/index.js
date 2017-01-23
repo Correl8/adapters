@@ -98,68 +98,70 @@ adapter.storeConfig = function(c8, result) {
 }
 
 adapter.importData = function(c8, conf, opts) {
-  var auth = neurio.Auth;
-  var lastDate = new Date();
-  var firstDate = new Date(lastDate.getTime() - (MS_IN_DAY));
-  auth.simple(conf.clientId, conf.clientSecret).then(function (client) {
-    client.user().then(function(user) {
-      if (user && user.locations && user.locations.length) {
-        c8.type(adapter.types[2].name).search({
-          _source: ['timestamp', 'cumulativeConsumptionEnergy'],
-          size: 1,
-          sort: [{'timestamp': 'desc'}],
-        }).then(function(response) {
-          var resp = c8.trimResults(response);
-          if (opts.firstDate) {
-            firstDate = new Date(opts.firstDate);
-            console.log('Setting first time to ' + firstDate);
-          }
-          else if (resp && resp.timestamp) {
-            var d = new Date(resp.timestamp);
-            lastConsumptionEnery = resp.cumulativeConsumptionEnergy;
-            firstDate = new Date(d.getTime() + 1);
-            console.log('Setting first time to ' + firstDate);
-          }
-          else {
-            firstDate = new Date(user.createdAt);
-            console.warn('No previously indexed data, setting first time to ' + firstDate);
-          }
-          if (opts.lastDate) {
-            lastDate = new Date(opts.lastDate);
-          }
-          else {
-            lastDate = new Date();
-          }
-          if (lastDate.getTime() >= (firstDate.getTime() + MS_IN_DAY)) {
-            lastDate = new Date(
-              firstDate.getFullYear(),
-              firstDate.getMonth(),
-              firstDate.getDate() + 1,
-              firstDate.getHours(),
-              firstDate.getMinutes(),
-              firstDate.getSeconds(),
-              firstDate.getMilliseconds()-1
-            );
-            console.warn('Max time range 24 hours, setting end time to ' + lastDate);
-          }
-          for (var i=0; i<user.locations.length; i++) {
-            var locId = user.locations[i].id;
-            getAppliancePage(c8, client, locId, firstDate, lastDate, MIN_POWER, EVENTS_PER_PAGE, 1);
-            for (var j=0; j<user.locations[i].sensors.length; j++) {
-              var sensorId = user.locations[i].sensors[j].id;
-              getSamplesHistoryPage(c8, client, sensorId, firstDate, lastDate, GRANULARITY, FREQUENCY, EVENTS_PER_PAGE, 1);
-              getEnergyStats(c8, client, sensorId, firstDate, lastDate, GRANULARITY, FREQUENCY);
+  return new Promise(function (fulfill, reject){
+    var auth = neurio.Auth;
+    var lastDate = new Date();
+    var firstDate = new Date(lastDate.getTime() - (MS_IN_DAY));
+    auth.simple(conf.clientId, conf.clientSecret).then(function (client) {
+      client.user().then(function(user) {
+        if (user && user.locations && user.locations.length) {
+          c8.type(adapter.types[2].name).search({
+            _source: ['timestamp', 'cumulativeConsumptionEnergy'],
+            size: 1,
+            sort: [{'timestamp': 'desc'}],
+          }).then(function(response) {
+            var resp = c8.trimResults(response);
+            if (opts.firstDate) {
+              firstDate = new Date(opts.firstDate);
+              console.log('Setting first time to ' + firstDate);
             }
-          }
-        }).catch(function(error) {
-          console.trace(error);
-        });
-      }
+            else if (resp && resp.timestamp) {
+              var d = new Date(resp.timestamp);
+              lastConsumptionEnery = resp.cumulativeConsumptionEnergy;
+              firstDate = new Date(d.getTime() + 1);
+              console.log('Setting first time to ' + firstDate);
+            }
+            else {
+              firstDate = new Date(user.createdAt);
+              console.warn('No previously indexed data, setting first time to ' + firstDate);
+            }
+            if (opts.lastDate) {
+              lastDate = new Date(opts.lastDate);
+            }
+            else {
+              lastDate = new Date();
+            }
+            if (lastDate.getTime() >= (firstDate.getTime() + MS_IN_DAY)) {
+              lastDate = new Date(
+                firstDate.getFullYear(),
+                firstDate.getMonth(),
+                firstDate.getDate() + 1,
+                firstDate.getHours(),
+                firstDate.getMinutes(),
+                firstDate.getSeconds(),
+                firstDate.getMilliseconds()-1
+              );
+              console.warn('Max time range 24 hours, setting end time to ' + lastDate);
+            }
+            for (var i=0; i<user.locations.length; i++) {
+              var locId = user.locations[i].id;
+              getAppliancePage(c8, client, locId, firstDate, lastDate, MIN_POWER, EVENTS_PER_PAGE, 1);
+              for (var j=0; j<user.locations[i].sensors.length; j++) {
+                var sensorId = user.locations[i].sensors[j].id;
+                getSamplesHistoryPage(c8, client, sensorId, firstDate, lastDate, GRANULARITY, FREQUENCY, EVENTS_PER_PAGE, 1);
+                getEnergyStats(c8, client, sensorId, firstDate, lastDate, GRANULARITY, FREQUENCY);
+              }
+            }
+          }).catch(function(error) {
+            reject(error);
+          });
+        }
+      }).catch(function(error) {
+        reject(error);
+      });
     }).catch(function(error) {
-      console.trace(error);
+      reject(error);
     });
-  }).catch(function(error) {
-    console.trace(error);
   });
 };
 

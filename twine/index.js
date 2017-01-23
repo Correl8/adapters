@@ -54,30 +54,32 @@ adapter.storeConfig = function(c8, result) {
 }
 
 adapter.importData = function(c8, conf, opts) {
-  if (conf.deviceId) {
-    var client = new Bowline(conf);
-    return client.fetch(function(err, response){
-      if (err) {
-        console.trace(err);
-        return;
-      }
-      response.id = response.time.timestamp + '-' + conf.deviceId;
-      response.meta.sensor = conf.deviceId;
-      response.timestamp = new Date(response.time.timestamp * 1000);
-      response.measureTime = response.time;
-      delete(response.time);
-      console.log(response.timestamp);
-      return c8.insert(response).then(function(result) {
-        // console.log(result);
-        // console.log('Indexed ' + result.items.length + ' documents in ' + result.took + ' ms.');
-      }).catch(function(error) {
-        console.trace(error);
+  return new Promise(function (fulfill, reject){
+    if (conf.deviceId) {
+      var client = new Bowline(conf);
+      return client.fetch(function(err, response){
+        if (err) {
+          console.trace(err);
+          return;
+        }
+        response.id = response.time.timestamp + '-' + conf.deviceId;
+        response.meta.sensor = conf.deviceId;
+        response.timestamp = new Date(response.time.timestamp * 1000);
+        response.measureTime = response.time;
+        delete(response.time);
+        c8.insert(response).then(function(result) {
+          // console.log(result);
+          console.log(response.timestamp + ': ' + result.result);
+          // console.log('Indexed ' + result.items.length + ' documents in ' + result.took + ' ms.');
+        }).catch(function(error) {
+          reject(error);
+        });
       });
-    });
-  }
-  else {
-    console.log('Configure first.');
-  }
+    }
+    else {
+      reject('Configure first.');
+    }
+  });
 };
 
 module.exports = adapter;

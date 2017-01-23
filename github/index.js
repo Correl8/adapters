@@ -92,91 +92,97 @@ adapter.storeConfig = function(c8, result) {
 }
 
 adapter.importData = function(c8, conf, opts) {
-  github.authenticate({
-    type: "oauth",
-    token: conf.token,
-  });
-  return c8.search({
-    _source: ['timestamp'],
-    size: 1,
-    sort: [{'timestamp': 'desc'}],
-  }).then(function(response) {
-    var resp = c8.trimResults(response);
-    var firstDate, lastDate;
-    if (opts.firstDate) {
-      firstDate = new Date(opts.firstDate);
-      console.log('Setting first time to ' + firstDate);
-    }
-    else if (resp && resp.timestamp) {
-      var d = new Date(resp.timestamp);
-      firstDate = new Date(d.getTime() + 1);
-      console.log('Setting first time to ' + firstDate);
-    }
-    else {
-      firstDate = new Date();
-      firstDate.setTime(firstDate.getTime() - MS_IN_DAY);
-      console.warn('No previously indexed data, setting first time to ' + firstDate);
-    }
-    if (opts.lastDate) {
-      lastDate = new Date(opts.lastDate);
-    }
-    else {
-      lastDate = new Date();
-    }
-    if (lastDate.getTime() >= (firstDate.getTime() + (MS_IN_DAY * MAX_DAYS))) {
-      lastDate.setTime(firstDate.getTime() + (MS_IN_DAY * MAX_DAYS) - 1);
-      console.warn('Max time range ' + MAX_DAYS + ' days, setting end time to ' + lastDate);
-    }
-    github.repos.getAll({per_page: 100}, function(err, res) {
-      if (err) {
-        console.error(err);
-        return;
+  return new Promise(function (fulfill, reject){
+    github.authenticate({
+      type: "oauth",
+      token: conf.token,
+    });
+    return c8.search({
+      _source: ['timestamp'],
+      size: 1,
+      sort: [{'timestamp': 'desc'}],
+    }).then(function(response) {
+      var resp = c8.trimResults(response);
+      var firstDate, lastDate;
+      if (opts.firstDate) {
+        firstDate = new Date(opts.firstDate);
+        console.log('Setting first time to ' + firstDate);
       }
-      for (var i=0; i<res.length; i++) {
-        var repo = res[i];
-        // console.log(JSON.stringify(repo));
-        var msg = {
-          user: repo.owner.login,
-          repo: repo.name,
-          author: conf.user,
-          since: firstDate.toISOString(),
-          until: lastDate.toISOString(),
-          per_page: 100
-        };
-        // console.log(msg);
-        github.repos.getCommits(msg, function(err, subres) {
-          if (err) {
-            // don't bother with "not found" and "repo empty" messages
-            if ((err.code != 404) && (err.code != 409)) {
-              console.error(err.code + ': ' + err.message);
-            }
-            return;
-          }
-          // console.log(JSON.stringify(subres[0], null, 2));
-          // console.log(subres.length);
-          var bulk = [];
-          for (var j=0; j<subres.length; j++) {
-            var commit = subres[j];
-            var match;
-            if (match = commit.url.match(/github\.com\/repos\/(.*?)\/commits/)) {
-              var repo = match[1].split('/');
-            }
-            commit.timestamp = commit.commit.author.date;
-            bulk.push({index: {_index: c8._index, _type: c8._type, _id: commit.sha}});
-            bulk.push(commit);
-          }
-          // console.log(JSON.stringify(bulk, null, 2));
-          if (bulk.length > 0) {
-            return c8.bulk(bulk).then(function(result) {
-              console.log('Indexed ' + result.items.length + ' commits in ' + result.took + ' ms.');
-              bulk = null;
-            }).catch(function(error) {
-              console.trace(error);
-              bulk = null;
-            });
-          }
-        });
+      else if (resp && resp.timestamp) {
+        var d = new Date(resp.timestamp);
+        firstDate = new Date(d.getTime() + 1);
+        console.log('Setting first time to ' + firstDate);
       }
+      else {
+        firstDate = new Date();
+        firstDate.setTime(firstDate.getTime() - MS_IN_DAY);
+        console.warn('No previously indexed data, setting first time to ' + firstDate);
+      }
+      if (opts.lastDate) {
+        lastDate = new Date(opts.lastDate);
+      }
+      else {
+        lastDate = new Date();
+      }
+      if (lastDate.getTime() >= (firstDate.getTime() + (MS_IN_DAY * MAX_DAYS))) {
+        lastDate.setTime(firstDate.getTime() + (MS_IN_DAY * MAX_DAYS) - 1);
+        console.warn('Max time range ' + MAX_DAYS + ' days, setting end time to ' + lastDate);
+      }
+      github.repos.getAll({per_page: 100}, function(err, res) {
+        if (err) {
+          console.error(err);
+          return;
+        }
+        for (var i=0; i<res.length; i++) {
+          var repo = res[i];
+          // console.log(JSON.stringify(repo.name));
+          var msg = {
+            user: repo.owner.login,
+            repo: repo.name,
+            author: conf.user,
+            since: firstDate.toISOString(),
+            until: lastDate.toISOString(),
+            per_page: 100
+          };
+          // console.log(msg);
+          github.repos.getCommits(msg, function(err, subres) {
+            if (err) {
+              // don't bother with "not found" and "repo empty" messages
+              if ((err.code != 404) && (err.code != 409)) {
+                console.error(err.code + ': ' + err.message);
+              }
+              return;
+            }
+            // console.log(JSON.stringify(subres[0], null, 2));
+            // console.log(subres.length);
+            var bulk = [];
+            for (var j=0; j<subres.length; j++) {
+              var commit = subres[j];
+              var match;
+              if (match = commit.url.match(/github\.com\/repos\/(.*?)\/commits/)) {
+                var repo = match[1].split('/');
+              }
+              commit.timestamp = commit.commit.author.date;
+              bulk.push({index: {_index: c8._index, _type: c8._type, _id: commit.sha}});
+              bulk.push(commit);
+            }
+            // console.log(JSON.stringify(bulk, null, 2));
+            if (bulk.length > 0) {
+              c8.bulk(bulk).then(function(result) {
+                bulk = null;
+                console.log('Indexed ' + result.items.length + ' commits in ' + result.took + ' ms.');
+              }).catch(function(error) {
+                bulk = null;
+                reject(error);
+              });
+            }
+          });
+        }
+        fulfill('Checked ' + res.length + ' repositories');
+      });
+    }).catch(function(error) {
+      console.trace(error);
+      bulk = null;
     });
   });
 }

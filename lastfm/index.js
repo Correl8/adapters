@@ -45,80 +45,88 @@ adapter.storeConfig = function(c8, result) {
 }
 
 adapter.importData = function(c8, conf, opts) {
-  console.log('Getting first date...');
-  var lfm = new LastfmAPI({
-    'api_key' : conf.clientId,
-    'secret' : conf.clientSecret
-  });
-  var firstDate, lastDate;
-  return c8.type(adapter.types[0].name).search({
-    _source: ['timestamp'],
-    size: 1,
-    sort: [{'timestamp': 'desc'}],
-  }).then(function(response) {
-    var resp = c8.trimResults(response);
-    var firstDate = new Date();
-    var lastDate = opts.lastDate || new Date();;
-    if (opts.firstDate) {
-      firstDate = new Date(opts.firstDate);
-      console.log('Setting first time to ' + firstDate);
-    }
-    else if (resp && resp.timestamp) {
-      var d = new Date(resp.timestamp);
-      firstDate.setTime(d.getTime() + 1);
-      console.log('Setting first time to ' + firstDate);
-    }
-    else {
-      firstDate.setTime(firstDate.getTime() - MS_IN_DAY);
-      console.warn('No previously indexed data, setting first time to ' + firstDate);
-    }
-    if (lastDate.getTime() >= (firstDate.getTime() + (MS_IN_DAY * MAX_DAYS))) {
-      lastDate = new Date();
-      lastDate.setTime(firstDate.getTime() + (MS_IN_DAY * MAX_DAYS) - 1000);
-      console.warn('Max time range ' + MAX_DAYS + ' days, setting end time to ' + lastDate);
-    }
-    var params = {
-      limit: 200,
-      user: conf.username,
-      from: firstDate.getTime()/1000,
-      to: lastDate.getTime()/1000,
-      extended: true,
-      page: 1
-    };
-    // console.log(JSON.stringify(params));
-    getRecent(c8, lfm, params);
+  return new Promise(function (fulfill, reject){
+    console.log('Getting first date...');
+    var lfm = new LastfmAPI({
+      'api_key' : conf.clientId,
+      'secret' : conf.clientSecret
+    });
+    var firstDate, lastDate;
+    return c8.type(adapter.types[0].name).search({
+      _source: ['timestamp'],
+      size: 1,
+      sort: [{'timestamp': 'desc'}],
+    }).then(function(response) {
+      var resp = c8.trimResults(response);
+      var firstDate = new Date();
+      var lastDate = opts.lastDate || new Date();;
+      if (opts.firstDate) {
+        firstDate = new Date(opts.firstDate);
+        console.log('Setting first time to ' + firstDate);
+      }
+      else if (resp && resp.timestamp) {
+        var d = new Date(resp.timestamp);
+        firstDate.setTime(d.getTime() + 1);
+        console.log('Setting first time to ' + firstDate);
+      }
+      else {
+        firstDate.setTime(firstDate.getTime() - MS_IN_DAY);
+        console.warn('No previously indexed data, setting first time to ' + firstDate);
+      }
+      if (lastDate.getTime() >= (firstDate.getTime() + (MS_IN_DAY * MAX_DAYS))) {
+        lastDate = new Date();
+        lastDate.setTime(firstDate.getTime() + (MS_IN_DAY * MAX_DAYS) - 1000);
+        console.warn('Max time range ' + MAX_DAYS + ' days, setting end time to ' + lastDate);
+      }
+      var params = {
+        limit: 200,
+        user: conf.username,
+        from: firstDate.getTime()/1000,
+        to: lastDate.getTime()/1000,
+        extended: true,
+        page: 1
+      };
+      // console.log(JSON.stringify(params));
+	getRecent(c8, lfm, params).then(function(message) {
+          fulfill(message);
+	}).catch(function(error) {
+          reject(error);
+	});;
+    });
   });
 }
 
 function getRecent(c8, lfm, params) {
-  lfm.user.getRecentTracks(params, function(err, recentTracks) {
-    if (err) {
-      console.trace(err);
-    }
-    console.log(recentTracks.track.length + ' tracks');
-    var bulk = [];
-    if (params.page < recentTracks['@attr'].totalPages) {
-      params.page++;
-      getRecent(c8, lfm, params);
-    }
-    if (!recentTracks || !recentTracks.track || !recentTracks.track.length) {
-      return;
-    }
-    for (var i=0; i<recentTracks.track.length; i++) {
-      var track = recentTracks.track[i];
-      track.timestamp = track.date.uts * 1000;
-      // console.log(JSON.stringify(track));
-      var id = track.date.uts + track.artist['#text'] + track.name;
-      bulk.push({index: {_index: c8._index, _type: c8._type, _id: id}});
-      bulk.push(track);
-    }
-    // console.log(JSON.stringify(bulk, null, 2));
-    c8.bulk(bulk).then(function(result) {
-      console.log('Indexed ' + result.items.length + ' items in ' + result.took + ' ms.');
-      bulk = null;
-    }).catch(function(error) {
-      console.trace(error);
-      bulk = null;
+  return new Promise(function (fulfill, reject){
+    lfm.user.getRecentTracks(params, function(err, recentTracks) {
+      if (err) {
+        console.trace(err);
+      }
+      console.log(recentTracks.track.length + ' tracks');
+      var bulk = [];
+      if (params.page < recentTracks['@attr'].totalPages) {
+        params.page++;
+        getRecent(c8, lfm, params);
+      }
+      if (!recentTracks || !recentTracks.track || !recentTracks.track.length) {
+        fulfill('No recent tracks.');
+      }
+      for (var i=0; i<recentTracks.track.length; i++) {
+        var track = recentTracks.track[i];
+        track.timestamp = track.date.uts * 1000;
+        // console.log(JSON.stringify(track));
+        var id = track.date.uts + track.artist['#text'] + track.name;
+        bulk.push({index: {_index: c8._index, _type: c8._type, _id: id}});
+        bulk.push(track);
+      }
+      // console.log(JSON.stringify(bulk, null, 2));
+      c8.bulk(bulk).then(function(result) {
+        fulfill('Indexed ' + result.items.length + ' items in ' + result.took + ' ms.');
+        bulk = null;
+      }).catch(function(error) {
+        reject(error);
+        bulk = null;
+      });
     });
   });
 }

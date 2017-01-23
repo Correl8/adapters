@@ -178,122 +178,125 @@ adapter.storeConfig = function(c8, result) {
 }
 
 adapter.importData = function(c8, conf, opts) {
-  var clientSecret = conf.installed.client_secret;
-  var clientId = conf.installed.client_id;
-  var redirectUrl = conf.installed.redirect_uris[0];
-  var auth = new googleAuth();
-  var oauth2Client = new auth.OAuth2(clientId, clientSecret, redirectUrl);
-  oauth2Client.credentials = conf.credentials;
-  var calendar = google.calendar('v3');
-  calendar.calendarList.list({auth: oauth2Client}, function(err, resp) {
-    if (err) {
-      console.log('The calendar API returned an error when reading calendars: ' + err);
-      return;
-    }
-    var params = [];
-    var calendars = [];
-    for (var i=0; i<resp.items.length; i++) {
-      var calId = resp.items[i].id;
-      calendars[i] = calId;
-      // console.log(calId);
-      params[i] = {
-        _source: ['timestamp', 'calendarId'],
-        query: {
-          match: {
-            calendarId: calId
-          }
-        },
-        size: 1,
-        sort: [{'timestamp': 'desc'}],
-      };
-    }
-    c8.msearch(params).then(function(response) {
-      if (!response || !response.responses) {
+  return new Promise(function (fulfill, reject){
+    var clientSecret = conf.installed.client_secret;
+    var clientId = conf.installed.client_id;
+    var redirectUrl = conf.installed.redirect_uris[0];
+    var auth = new googleAuth();
+    var oauth2Client = new auth.OAuth2(clientId, clientSecret, redirectUrl);
+    oauth2Client.credentials = conf.credentials;
+    var calendar = google.calendar('v3');
+    calendar.calendarList.list({auth: oauth2Client}, function(err, resp) {
+      if (err) {
+        reject('The calendar API returned an error when reading calendars: ' + err);
         return;
       }
-      // console.log(response);
-      for (var i=0; i<response.responses.length; i++) {
-        let calId = calendars[i];
-        var res = response.responses[i];
-        var firstDate, lastDate;
-        if (opts.firstDate) {
-          firstDate = opts.firstDate;
-          console.log('Setting first time for ' + calId + ' to ' + firstDate);
-        }
-        else if (res.hits.hits && res.hits.hits[0] && res.hits.hits[0]._source.timestamp) {
-          // console.log(res.hits.hits[0]._source);
-          var d = new Date(res.hits.hits[0]._source.timestamp);
-          firstDate = new Date(d.getTime() + 1);
-          console.log('Setting first time for ' + calId + '  to ' + firstDate);
-        }
-        else {
-          firstDate = new Date();
-          firstDate.setTime(firstDate.getTime() - MS_IN_DAY);
-          console.warn('No previously indexed data, setting first time for ' + calId + '  to ' + firstDate);
-        }
-        lastDate = opts.lastDate || new Date();
-        if (lastDate.getTime() >= (firstDate.getTime() + (MS_IN_DAY * MAX_DAYS))) {
-          lastDate.setTime(firstDate.getTime() + (MS_IN_DAY * MAX_DAYS) - 1);
-          console.warn('Max time range ' + MAX_DAYS + ' days, setting end time for ' + calId + '  to ' + lastDate);
-        }
-        oauth2Client.credentials = conf.credentials;
-        var searchOpts = {
-          auth: oauth2Client,
-          calendarId: calId,
-          timeMin: firstDate.toISOString(),
-          timeMax: lastDate.toISOString(),
-          maxResults: MAX_EVENTS,
-          singleEvents: true,
-          orderBy: 'startTime'
+      var params = [];
+      var calendars = [];
+      for (var i=0; i<resp.items.length; i++) {
+        var calId = resp.items[i].id;
+        calendars[i] = calId;
+        // console.log(calId);
+        params[i] = {
+          _source: ['timestamp', 'calendarId'],
+          query: {
+            match: {
+              calendarId: calId
+            }
+          },
+          size: 1,
+          sort: [{'timestamp': 'desc'}],
         };
-        // console.log('Reading calendar ' + calId);
-        // console.log(searchOpts);
-        calendar.events.list(searchOpts, function(error, response) {
-          // console.log(response);
-          if (error) {
-            // console.log(error);
-            if (error == 'Error: Not Found') {
-              // console.log(cal + ': no events found between '+ firstDate + ' and ' + lastDate + '.');
-              // silently ignore
+      }
+      c8.msearch(params).then(function(response) {
+        if (!response || !response.responses) {
+          return;
+        }
+        // console.log(response);
+        for (var i=0; i<response.responses.length; i++) {
+          let calId = calendars[i];
+          var res = response.responses[i];
+          var firstDate, lastDate;
+          if (opts.firstDate) {
+            firstDate = opts.firstDate;
+            console.log('Setting first time for ' + calId + ' to ' + firstDate);
+          }
+          else if (res.hits.hits && res.hits.hits[0] && res.hits.hits[0]._source.timestamp) {
+            // console.log(res.hits.hits[0]._source);
+            var d = new Date(res.hits.hits[0]._source.timestamp);
+            firstDate = new Date(d.getTime() + 1);
+            console.log('Setting first time for ' + calId + '  to ' + firstDate);
+          }
+          else {
+            firstDate = new Date();
+            firstDate.setTime(firstDate.getTime() - MS_IN_DAY);
+            console.warn('No previously indexed data, setting first time for ' + calId + '  to ' + firstDate);
+          }
+          lastDate = opts.lastDate || new Date();
+          if (lastDate.getTime() >= (firstDate.getTime() + (MS_IN_DAY * MAX_DAYS))) {
+            lastDate.setTime(firstDate.getTime() + (MS_IN_DAY * MAX_DAYS) - 1);
+            console.warn('Max time range ' + MAX_DAYS + ' days, setting end time for ' + calId + '  to ' + lastDate);
+          }
+          oauth2Client.credentials = conf.credentials;
+          var searchOpts = {
+            auth: oauth2Client,
+            calendarId: calId,
+            timeMin: firstDate.toISOString(),
+            timeMax: lastDate.toISOString(),
+            maxResults: MAX_EVENTS,
+            singleEvents: true,
+            orderBy: 'startTime'
+          };
+          // console.log('Reading calendar ' + calId);
+          // console.log(searchOpts);
+          calendar.events.list(searchOpts, function(error, response) {
+            // console.log(response);
+            if (error) {
+              // console.log(error);
+              if (error == 'Error: Not Found') {
+                // console.log(cal + ': no events found between '+ firstDate + ' and ' + lastDate + '.');
+                // silently ignore
+                return;
+              }
+              reject('The calendar API returned an error when reading events: ' + error);
               return;
             }
-            console.log('The calendar API returned an error when reading events: ' + error);
-            return;
-          }
-          // console.log(response);
-          var cal = response.summary;
-          var events = response.items;
-          if (!events || events.length === 0) {
-            console.log(cal + ': no events found between '+ firstDate + ' and ' + lastDate + '.');
-            return;
-          }
-          console.log(cal + ': found ' + events.length + ' events:');
-          var bulk = [];
-          for (var j=0; j<events.length; j++) {
-            var event = events[j];
-            var start = new Date(event.start.dateTime || event.start.date);
-            var end = new Date(event.end.dateTime || event.end.date);
-            event.calendar = cal;
-            event.calendarId = calId;
-            event.timestamp = start;
-            event.duration = (end.getTime() - start.getTime())/1000;
-            console.log('%s %d: %s - %s (%d s)', cal, j+1, start, event.summary, event.duration);
-            bulk.push({index: {_index: c8._index, _type: c8._type, _id: event.id}});
-            bulk.push(event);
-          }
-          // console.log(bulk);
-          c8.bulk(bulk).then(function(result) {
-            console.log('Indexed ' + result.items.length + ' events in ' + result.took + ' ms.');
-            bulk = null;
-          }).catch(function(error) {
-            console.trace(error);
-            bulk = null;
+            // console.log(response);
+            var cal = response.summary;
+            var events = response.items;
+            if (!events || events.length === 0) {
+              console.log(cal + ': no events found between '+ firstDate + ' and ' + lastDate + '.');
+              return;
+            }
+            // console.log(cal + ': found ' + events.length + ' events:');
+            var bulk = [];
+            for (var j=0; j<events.length; j++) {
+              var event = events[j];
+              var start = new Date(event.start.dateTime || event.start.date);
+              var end = new Date(event.end.dateTime || event.end.date);
+              event.calendar = cal;
+              event.calendarId = calId;
+              event.timestamp = start;
+              event.duration = (end.getTime() - start.getTime())/1000;
+              console.log('%s %d: %s - %s (%d s)', cal, j+1, start, event.summary, event.duration);
+              bulk.push({index: {_index: c8._index, _type: c8._type, _id: event.id}});
+              bulk.push(event);
+            }
+            // console.log(bulk);
+            c8.bulk(bulk).then(function(result) {
+              console.log('Indexed ' + result.items.length + ' events in ' + result.took + ' ms.');
+              bulk = null;
+            }).catch(function(error) {
+              reject(error);
+              bulk = null;
+            });
           });
-        });
-      }
-    }).catch(function(error) {
-      console.trace(error);
-      bulk = null;
+        }
+        fulfill('Checked ' + response.responses.length + ' calendars.');
+      }).catch(function(error) {
+        reject(error);
+        bulk = null;
+      });
     });
   });
 };

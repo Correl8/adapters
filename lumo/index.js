@@ -101,133 +101,143 @@ adapter.storeConfig = function(c8, result) {
 };
 
 adapter.importData = function(c8, conf, opts) {
-  c8.type(postureIndex).search({
-    _source: ['timestamp'],
-    size: 1,
-    sort: [{'timestamp': 'desc'}],
-  }).then(function(response) {
-    console.log('Getting first date...');
-    return c8.search({
+  return new Promise(function (fulfill, reject){
+    c8.type(postureIndex).search({
       _source: ['timestamp'],
       size: 1,
       sort: [{'timestamp': 'desc'}],
     }).then(function(response) {
-      var resp = c8.trimResults(response);
-      var firstDate = new Date();
-      var lastDate = opts.lastDate || new Date();
-      firstDate.setTime(lastDate.getTime() - (MAX_DAYS * MS_IN_DAY));
-      if (opts.firstDate) {
-        firstDate = new Date(opts.firstDate);
-        console.log('Setting first time to ' + firstDate);
-      }
-      else if (resp && resp.timestamp) {
-        var d = new Date(resp.timestamp);
-        firstDate.setTime(d.getTime() + 1);
-        console.log('Setting first time to ' + firstDate);
-      }
-      if (lastDate.getTime() > (firstDate.getTime() + MAX_DAYS * MS_IN_DAY)) {
-        lastDate.setTime(firstDate.getTime() + MAX_DAYS * MS_IN_DAY);
-        console.warn('Setting last date to ' + lastDate);
-      }
-      importData(c8, conf, firstDate, lastDate);
+      console.log('Getting first date...');
+      c8.search({
+        _source: ['timestamp'],
+        size: 1,
+        sort: [{'timestamp': 'desc'}],
+      }).then(function(response) {
+        var resp = c8.trimResults(response);
+        var firstDate = new Date();
+        var lastDate = opts.lastDate || new Date();
+        firstDate.setTime(lastDate.getTime() - (MAX_DAYS * MS_IN_DAY));
+        if (opts.firstDate) {
+          firstDate = new Date(opts.firstDate);
+          console.log('Setting first time to ' + firstDate);
+        }
+        else if (resp && resp.timestamp) {
+          var d = new Date(resp.timestamp);
+          firstDate.setTime(d.getTime() + 1);
+          console.log('Setting first time to ' + firstDate);
+        }
+        if (lastDate.getTime() > (firstDate.getTime() + MAX_DAYS * MS_IN_DAY)) {
+          lastDate.setTime(firstDate.getTime() + MAX_DAYS * MS_IN_DAY);
+          console.warn('Setting last date to ' + lastDate);
+        }
+        importData(c8, conf, firstDate, lastDate).then(function(message) {
+          fulfill(message);
+        }).catch(function(error) {
+           reject(error);
+        });
+      });
+    }).catch(function(error) {
+      reject(error);
     });
-  }).catch(function(error) {
-    console.trace(error);
   });
 }
 
 function importData(c8, conf, firstDate, lastDate) {
-  var options = {
-    clientId: conf.client_id,
-    clientSecret: conf.client_secret,
-    redirectUri: conf.redirect_uri
-  };
-  var token = conf.access_token;
-  var authClient = lumolift.Auth(options);
-  var auth = authClient.createToken(conf.access_token, conf.refresh_token);
-  auth.refresh().then(function(refreshed) {
-    Object.assign(conf, refreshed.data);
-    return c8.config(conf).then(function(){
-      var client = new lumolift.Client(conf.access_token);
-      if (!firstDate) {
-        console.warn('No starting date...');
-        return;
-      }
-      var start = Math.floor(firstDate.getTime()/1000);
-      var end = Math.ceil(lastDate.getTime()/1000);
-      client.activities(start, end).then(function (response) {
-        // console.log(JSON.stringify(response, null, 1));
-        var bulk = [];
-        var obj = response.data;
-        var index = postureIndex;
-        for (var i=0; i<obj.length; i++) {
-          // console.log(JSON.stringify(obj[i]) + ' (' + i + ')');
-          obj[i].localTime = obj[i].localTime * 1000;
-          obj[i].uploadTime = obj[i].uploadTime * 1000;
-          // local time will be handled as if it was UTC
-          var ts = new Date(obj[i].localTime);
-          var tzOffset = ts.getTimezoneOffset() * 60 * 1000;
-          ts.setTime(ts.getTime() + tzOffset);
-          obj[i].localTime += tzOffset;    
-          obj[i].timestamp = ts;
-          var type = obj[i].dataType;
-          if (type == 'TOTAL_STEPS') {
-            obj[i].totalSteps = obj[i].value;
+  return new Promise(function (fulfill, reject){
+    var options = {
+      clientId: conf.client_id,
+      clientSecret: conf.client_secret,
+      redirectUri: conf.redirect_uri
+    };
+    var token = conf.access_token;
+    var authClient = lumolift.Auth(options);
+    var auth = authClient.createToken(conf.access_token, conf.refresh_token);
+    auth.refresh().then(function(refreshed) {
+      Object.assign(conf, refreshed.data);
+      c8.config(conf).then(function(){
+        var client = new lumolift.Client(conf.access_token);
+        if (!firstDate) {
+          reject('No starting date...');
+        }
+        var start = Math.floor(firstDate.getTime()/1000);
+        var end = Math.ceil(lastDate.getTime()/1000);
+        client.activities(start, end).then(function (response) {
+          // console.log(JSON.stringify(response, null, 1));
+          var bulk = [];
+          var obj = response.data;
+          var index = postureIndex;
+          for (var i=0; i<obj.length; i++) {
+            // console.log(JSON.stringify(obj[i]) + ' (' + i + ')');
+            obj[i].localTime = obj[i].localTime * 1000;
+            obj[i].uploadTime = obj[i].uploadTime * 1000;
+            // local time will be handled as if it was UTC
+            var ts = new Date(obj[i].localTime);
+            var tzOffset = ts.getTimezoneOffset() * 60 * 1000;
+            ts.setTime(ts.getTime() + tzOffset);
+            obj[i].localTime += tzOffset;    
+            obj[i].timestamp = ts;
+            var type = obj[i].dataType;
+            if (type == 'TOTAL_STEPS') {
+              obj[i].totalSteps = obj[i].value;
+            }
+            else if (type == 'RUNNING_STEPS') {
+              obj[i].runningSteps = obj[i].value;
+            }
+            else if (type == 'TOTAL_DISTANCE') {
+              obj[i].totalDistance = obj[i].value;
+            }
+            else if (type == 'RUNNING_DISTANCE') {
+              obj[i].runningDistance = obj[i].value;
+            }
+            else if (type == 'TOTAL_CALORIES') {
+              obj[i].totalCalories = obj[i].value;
+            }
+            else if (type == 'WALKING_CALORIES') {
+              obj[i].walkingCalories = obj[i].value;
+            }
+            else if (type == 'TIME_WALKING') {
+              obj[i].walkingDuration = obj[i].value;
+            }
+            else if (type == 'TIME_RUNNING') {
+              obj[i].runningDuration = obj[i].value;
+            }
+            else if (type == 'RUNNING_CALORIES') {
+              obj[i].runningCalories = obj[i].value;
+            }
+            else if (type == 'TIME_IN_GOOD_POSTURE') {
+              obj[i].goodPostureDuration = obj[i].value;
+            }
+            else if (type == 'TIME_IN_BAD_POSTURE') {
+              obj[i].badPostureDuration = obj[i].value;
+            }
+            else {
+              console.error('Unknown type:' + JSON.stringify(obj[i], null, 2));
+              continue;
+            }
+            var id = ts.toISOString() + '-' + obj[i].dataSource + '-' + type;
+            console.log(id + ': ' + obj[i].value);
+            bulk.push({index: {_index: c8._index, _type: c8._type, _id: id}});
+            bulk.push(obj[i]);
           }
-          else if (type == 'RUNNING_STEPS') {
-            obj[i].runningSteps = obj[i].value;
-          }
-          else if (type == 'TOTAL_DISTANCE') {
-            obj[i].totalDistance = obj[i].value;
-          }
-          else if (type == 'RUNNING_DISTANCE') {
-            obj[i].runningDistance = obj[i].value;
-          }
-          else if (type == 'TOTAL_CALORIES') {
-            obj[i].totalCalories = obj[i].value;
-          }
-          else if (type == 'WALKING_CALORIES') {
-            obj[i].walkingCalories = obj[i].value;
-          }
-          else if (type == 'TIME_WALKING') {
-            obj[i].walkingDuration = obj[i].value;
-          }
-          else if (type == 'TIME_RUNNING') {
-            obj[i].runningDuration = obj[i].value;
-          }
-          else if (type == 'RUNNING_CALORIES') {
-            obj[i].runningCalories = obj[i].value;
-          }
-          else if (type == 'TIME_IN_GOOD_POSTURE') {
-            obj[i].goodPostureDuration = obj[i].value;
-          }
-          else if (type == 'TIME_IN_BAD_POSTURE') {
-            obj[i].badPostureDuration = obj[i].value;
+          if (bulk.length > 0) {
+            c8.bulk(bulk).then(function(result) {
+              fulfill('Indexed ' + result.items.length + ' documents in ' + result.took + ' ms.');
+            }).catch(function(error) {
+              reject(error)
+            });
           }
           else {
-            console.error('Unknown type:' + JSON.stringify(obj[i], null, 2));
-            continue;
+            fulfill('Nothing to index.');
           }
-          var id = ts.toISOString() + '-' + obj[i].dataSource + '-' + type;
-          console.log(id + ': ' + obj[i].value);
-          bulk.push({index: {_index: c8._index, _type: c8._type, _id: id}});
-          bulk.push(obj[i]);
-        }
-        if (bulk.length > 0) {
-          return c8.bulk(bulk).then(function(result) {
-            console.log('Indexed ' + result.items.length + ' documents in ' + result.took + ' ms.');
-          }).catch(function(error) {
-            console.trace(error);
-          });
-        }
+        }).catch(function(error){
+          reject(error)
+        })
       }).catch(function(error){
-        console.error(error)
-      })
+        reject(error)
+      });
     }).catch(function(error){
-      console.error(error)
+      reject(error)
     });
-  }).catch(function(error){
-    console.error(error)
   });
 }
 

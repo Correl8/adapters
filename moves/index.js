@@ -157,92 +157,104 @@ adapter.storeConfig = function(c8, result) {
 }
 
 adapter.importData = function(c8, conf, opts) {
-  moves = new movesApi(conf);
-  return c8.type(summaryType).search({
-    _source: ['timestamp'],
-    size: 1,
-    sort: [{'timestamp': 'desc'}],
-  }).then(function(response) {
-    // console.log('Getting first date...');
-    return c8.search({
+  return new Promise(function (fulfill, reject){
+    moves = new movesApi(conf);
+    return c8.type(summaryType).search({
       _source: ['timestamp'],
       size: 1,
       sort: [{'timestamp': 'desc'}],
     }).then(function(response) {
-      var resp = c8.trimResults(response);
-      var firstDate = new Date();
-      var lastDate = opts.lastDate || new Date();
-      var goneAsync = false;
-      firstDate.setTime(lastDate.getTime() - (MAX_DAYS * MS_IN_DAY));
-      if (opts.firstDate) {
-        firstDate = new Date(opts.firstDate);
-        // console.log('Setting first time to argument ' + firstDate);
-      }
-      else if (resp && resp.timestamp) {
-        var d = new Date(resp.timestamp);
-        // refetch yesterday for updated summary
-        firstDate.setTime(d.getTime());
-        // console.log('Setting first time to latest stored date ' + firstDate);
-      }
-      else {
-        goneAsync = true;
-        return moves.getProfile(function(error, user) {
-          if (error) {
-            console.trace(error);
-            return;
-          }
-          // console.log('Setting first time to Moves profile date ' + user.profile.firstDate);
-          firstDate = dates.parseISODate(user.profile.firstDate);
-          return importData(c8, conf, firstDate, lastDate);
-        });
-      }
-      if (!goneAsync) {
-        return importData(c8, conf, firstDate, lastDate);
-      }
+      // console.log('Getting first date...');
+      c8.search({
+        _source: ['timestamp'],
+        size: 1,
+        sort: [{'timestamp': 'desc'}],
+      }).then(function(response) {
+        var resp = c8.trimResults(response);
+        var firstDate = new Date();
+        var lastDate = opts.lastDate || new Date();
+        var goneAsync = false;
+        firstDate.setTime(lastDate.getTime() - (MAX_DAYS * MS_IN_DAY));
+        if (opts.firstDate) {
+          firstDate = new Date(opts.firstDate);
+          // console.log('Setting first time to argument ' + firstDate);
+        }
+        else if (resp && resp.timestamp) {
+          var d = new Date(resp.timestamp);
+          // refetch yesterday for updated summary
+          firstDate.setTime(d.getTime());
+          // console.log('Setting first time to latest stored date ' + firstDate);
+        }
+        else {
+          goneAsync = true;
+          moves.getProfile(function(error, user) {
+            if (error) {
+              console.trace(error);
+              return;
+            }
+            // console.log('Setting first time to Moves profile date ' + user.profile.firstDate);
+            firstDate = dates.parseISODate(user.profile.firstDate);
+            importData(c8, conf, firstDate, lastDate).then(function(message) {
+              fulfill(message);
+            }).catch(function(error) {
+              reject(error);
+            });
+          });
+        }
+        if (!goneAsync) {
+          importData(c8, conf, firstDate, lastDate).then(function(message) {
+            fulfill(message);
+          }).catch(function(error) {
+            reject(error);
+          });
+        }
+      });
+    }).catch(function(error) {
+      reject(error);
     });
-  }).catch(function(error) {
-    console.trace(error);
   });
 }
 
 function importData(c8, conf, firstDate, lastDate) {
-  if (!firstDate) {
-    console.warn('No starting date...');
-    return;
-  }
-  if (lastDate.getTime() > (firstDate.getTime() + MAX_DAYS * MS_IN_DAY)) {
-    lastDate.setTime(firstDate.getTime() + MAX_DAYS * MS_IN_DAY);
-    // console.warn('Time range of ' + MAX_DAYS + ' days exceeded. Setting last date to ' + lastDate);
-  }
-  var startTime = firstDate;
-  // startTime.setDate(startTime.getDate() + 1);
-  var fromDate = dates.day(startTime);
-  var toDate = dates.day(lastDate);
-  // var end = dates.day(lastDate);
-  if (fromDate == dates.day(new Date())) {
-    console.log('Today\'s data already exists! Try again tomorrow...');
-  }
-  var opts = {from: fromDate, to: toDate, trackPoints: true};
-  // console.log(opts);
-  moves.getStoryline(opts, function(error, documents) {
-    if (error) {
-      console.warn(error);
+  return new Promise(function (fulfill, reject){
+    if (!firstDate) {
+      reject('No starting date...');
       return;
     }
-    var bulk = [];
-    for (var i=0; i<documents.length; i++) {
-      var document = documents[i];
-      var prepared = splitToBulk(c8, prepareForElastic(document));
-      console.log(document.date + ': ' + prepared.length/2 + ' documents');
-      bulk = bulk.concat(prepared);
+    if (lastDate.getTime() > (firstDate.getTime() + MAX_DAYS * MS_IN_DAY)) {
+      lastDate.setTime(firstDate.getTime() + MAX_DAYS * MS_IN_DAY);
+      // console.warn('Time range of ' + MAX_DAYS + ' days exceeded. Setting last date to ' + lastDate);
     }
-    // for (var i=0; i<bulk.length; i++) {
-    //   console.log(JSON.stringify(bulk[i]));
-    // }
-    return c8.bulk(bulk).then(function(result) {
-      console.log('Indexed ' + result.items.length + ' documents in ' + result.took + ' ms.');
-    }).catch(function(error) {
-      console.trace(error);
+    var startTime = firstDate;
+    // startTime.setDate(startTime.getDate() + 1);
+    var fromDate = dates.day(startTime);
+    var toDate = dates.day(lastDate);
+    // var end = dates.day(lastDate);
+    if (fromDate == dates.day(new Date())) {
+      console.log('Today\'s data already exists! Try again tomorrow...');
+    }
+    var opts = {from: fromDate, to: toDate, trackPoints: true};
+    // console.log(opts);
+    moves.getStoryline(opts, function(error, documents) {
+      if (error) {
+        reject(error);
+        return;
+      }
+      var bulk = [];
+      for (var i=0; i<documents.length; i++) {
+        var document = documents[i];
+        var prepared = splitToBulk(c8, prepareForElastic(document));
+        console.log(document.date + ': ' + prepared.length/2 + ' documents');
+        bulk = bulk.concat(prepared);
+      }
+      // for (var i=0; i<bulk.length; i++) {
+      //   console.log(JSON.stringify(bulk[i]));
+      // }
+      c8.bulk(bulk).then(function(result) {
+        fulfill('Indexed ' + result.items.length + ' documents in ' + result.took + ' ms.');
+      }).catch(function(error) {
+        reject(error);
+      });
     });
   });
 }
