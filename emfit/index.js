@@ -64,53 +64,83 @@ adapter.storeConfig = function(c8, result) {
 };
 
 adapter.importData = function(c8, conf, opts) {
-  c8.type(presenceIndex).search({
-    _source: ['timestamp'],
-    size: 1,
-    sort: [{'timestamp': 'desc'}],
-  }).then(function(response) {
-    // console.log('Getting first date...');
-    return c8.search({
+  return new Promise(function (fulfill, reject){
+    c8.type(presenceIndex).search({
       _source: ['timestamp'],
       size: 1,
       sort: [{'timestamp': 'desc'}],
     }).then(function(response) {
-      var resp = c8.trimResults(response);
-      var firstDate = new Date();
-      var lastDate = opts.lastDate || new Date();
-      firstDate.setTime(lastDate.getTime() - (MAX_DAYS * MS_IN_DAY));
-      if (opts.firstDate) {
-        firstDate = new Date(opts.firstDate);
-        console.log('Setting first time to ' + firstDate);
-      }
-      else if (resp && resp.timestamp) {
-        var d = new Date(resp.timestamp);
-        firstDate.setTime(d.getTime() + 1);
-        console.log('Setting first time to ' + firstDate);
-      }
-      if (lastDate.getTime() > (firstDate.getTime() + MAX_DAYS * MS_IN_DAY)) {
-        lastDate.setTime(firstDate.getTime() + MAX_DAYS * MS_IN_DAY);
-        console.warn('Setting last date to ' + lastDate);
-      }
-      importData(c8, conf, firstDate, lastDate);
+      c8.search({
+        _source: ['timestamp'],
+        size: 1,
+        sort: [{'timestamp': 'desc'}],
+      }).then(function(response) {
+        var resp = c8.trimResults(response);
+        var firstDate = new Date();
+        var lastDate = opts.lastDate || new Date();
+        firstDate.setTime(lastDate.getTime() - (MAX_DAYS * MS_IN_DAY));
+        if (opts.firstDate) {
+          firstDate = new Date(opts.firstDate);
+          console.log('Setting first time to ' + firstDate);
+        }
+        else if (resp && resp.timestamp) {
+          var d = new Date(resp.timestamp);
+          firstDate.setTime(d.getTime() + 1);
+          console.log('Setting first time to ' + firstDate);
+        }
+        if (lastDate.getTime() > (firstDate.getTime() + MAX_DAYS * MS_IN_DAY)) {
+          lastDate.setTime(firstDate.getTime() + MAX_DAYS * MS_IN_DAY);
+          console.warn('Setting last date to ' + lastDate);
+        }
+        var qs = new QS()
+        qs.login(conf.username, conf.password).then(function(data) {
+          var deviceId = data.device_settings[0].device_id
+          Promise.all([getPresence(c8, qs, deviceId), getTrends(c8, qs, deviceId, firstDate, lastDate)]).then(function(results) {
+            fulfill(results.join('\n'));
+          }).catch(function(error) {
+            reject(error);
+          });
+        }).catch(function(error) {
+          reject(error);
+        });
+      }).catch(function(error) {
+        reject(error);
+      });
+    }).catch(function(error) {
+      reject(error);
     });
-  }).catch(function(error) {
-    console.trace(error);
   });
-}
+};
 
-function importData(c8, conf, firstDate, lastDate) {
-  var qs = new QS()
-  qs.login(conf.username, conf.password).then(function(data) {
-    var deviceId = data.device_settings[0].device_id
+/*
+        latest.timestamp = new Date(latest.time_end * 1000);
+        if (latest.bed_exit_periods && latest.bed_exit_periods.length) {
+          for (var i=0; i<latest.bed_exit_periods.length; i++) {
+            latest.bed_exit_periods[i] = {
+              exit_start: new Date(latest.bed_exit_periods[i][0] * 1000),
+              exit_end: new Date(latest.bed_exit_periods[i][1] * 1000),
+              exit_duration: latest.bed_exit_periods[i][1] - latest.bed_exit_periods[i][0]
+            }
+          }
+        }
+        return c8.type(presenceIndex).insert(latest).then(function(result) {
+          console.log(latest.timestamp);
+        }).catch(function(error) {
+          console.trace(error);
+        });
+*/
+
+function getPresence(c8, qs, deviceId) {
+  return new Promise(function (fulfill, reject){
     qs.latest(deviceId).then(function(latest) {
       if (latest.error) {
-        console.error('Could not index latest presence data: ' + latest.error);
-        return;
+        reject('Could not index latest presence data: ' + latest.error);
       }
+      var messages = [];
       if (latest.navigation_data && latest.navigation_data.length) {
         for (var i=0; i<latest.navigation_data.length; i++) {
           var periodId = latest.navigation_data[i].id;
+          messages.push('Presence: ' + periodId);
           qs.presence(periodId, deviceId).then(function(presence) {
             presence.time_start = new Date(presence.time_start * 1000);
             presence.time_end = new Date(presence.time_end * 1000);
@@ -163,54 +193,53 @@ function importData(c8, conf, firstDate, lastDate) {
                 presence.tossnturn_datapoints[i] = new Date(presence.tossnturn_datapoints[i] * 1000);
               }
             }
-            // console.log(presence);
-            return c8.type(presenceIndex).insert(presence).then(function(result) {
-              console.log(presence.timestamp);
+            c8.type(presenceIndex).insert(presence).then(function(result) {
+              console.log(presence.timestamp + ': ' + result.result);
             }).catch(function(error) {
-              console.trace(error);
+              reject(error);
             });
           });
         }
       }
-/*
-      latest.timestamp = new Date(latest.time_end * 1000);
-      if (latest.bed_exit_periods && latest.bed_exit_periods.length) {
-        for (var i=0; i<latest.bed_exit_periods.length; i++) {
-          latest.bed_exit_periods[i] = {
-            exit_start: new Date(latest.bed_exit_periods[i][0] * 1000),
-            exit_end: new Date(latest.bed_exit_periods[i][1] * 1000),
-            exit_duration: latest.bed_exit_periods[i][1] - latest.bed_exit_periods[i][0]
-          }
+      fulfill(messages.join('\n'));
+    });
+  });
+}
+
+function getTrends(c8, qs, deviceId, startTime, endTime) {
+  return new Promise(function (fulfill, reject){
+    qs.trends(deviceId, startTime, endTime).then(function(trends) {
+      if (trends.error || !trends.data) {
+        if (trends.error == 'Unsufficient dataset') {
+          fulfill('No trends available yet.');
+        }
+        else {
+          reject('Could not index trends: ' + trends.error);
         }
       }
-      return c8.type(presenceIndex).insert(latest).then(function(result) {
-        console.log(latest.timestamp);
-      }).catch(function(error) {
-        console.trace(error);
-      });
-*/
-    })
-      qs.trends(deviceId).then(function(trends) {
-      if (trends.error) {
-        console.error('Could not index trends: ' + trends.error);
-        return;
+      else {
+        var bulk = [];
+        for (var i=0; i<trends.data.length; i++) {
+          var trend = trends.data[i];
+          var id = trend.date;
+          trend.timestamp = new Date(trend.date);
+          bulk.push({index: {_index: c8.type(trendIndex)._index, _type: c8._type, _id: id}});
+          bulk.push(trend);
+          console.log('Trend: ' + trend.timestamp);
+        }
+        if (bulk.length > 0) {
+          c8.bulk(bulk).then(function(result) {
+            fulfill('Indexed ' + result.items.length + ' trend documents in ' + result.took + ' ms.');
+          }).catch(function(error) {
+            reject(error);
+          });
+        }
+        else {
+          fulfill('No trends available');
+        }
       }
-      var bulk = [];
-      for (var i=0; i<trends.length; i++) {
-        var id = trends[i].date;
-        trends[i].timestamp = new Date(trends[i].date);
-        bulk.push({index: {_index: c8.type(trendIndex)._index, _type: c8._type, _id: id}});
-        bulk.push(trends[i]);
-      }
-      if (bulk.length > 0) {
-        return c8.bulk(bulk).then(function(result) {
-          console.log('Indexed ' + result.items.length + ' trend documents in ' + result.took + ' ms.');
-        }).catch(function(error) {
-          console.trace(error);
-        });
-      }
-    })
-  })
+    });
+  });
 }
 
 module.exports = adapter;
