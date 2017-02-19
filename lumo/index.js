@@ -157,7 +157,7 @@ function importData(c8, conf, firstDate, lastDate) {
       c8.config(conf).then(function(){
         var client = new lumolift.Client(conf.access_token);
         if (!firstDate) {
-          reject('No starting date...');
+          reject(new Error('No starting date...'));
         }
         var start = Math.floor(firstDate.getTime()/1000);
         var end = Math.ceil(lastDate.getTime()/1000);
@@ -221,13 +221,23 @@ function importData(c8, conf, firstDate, lastDate) {
           }
           if (bulk.length > 0) {
             c8.bulk(bulk).then(function(result) {
+              if (result.errors) {
+                var messages = [];
+                for (var i=0; i<result.items.length; i++) {
+                  if (result.items[i].index.error) {
+                    messages.push(i + ': ' + result.items[i].index.error.reason);
+                  }
+                }
+                reject(new Error(messages.length + ' errors in bulk insert:\n ' + messages.join('\n ')));
+              }
               fulfill('Indexed ' + result.items.length + ' documents in ' + result.took + ' ms.');
             }).catch(function(error) {
-              reject(error)
+              reject(error);
+              bulk = null;
             });
           }
           else {
-            fulfill('Nothing to index.');
+            fulfill('No data available');
           }
         }).catch(function(error){
           reject(error)
