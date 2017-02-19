@@ -188,7 +188,7 @@ adapter.importData = function(c8, conf, opts) {
     var calendar = google.calendar('v3');
     calendar.calendarList.list({auth: oauth2Client}, function(err, resp) {
       if (err) {
-        reject('The calendar API returned an error when reading calendars: ' + err);
+        reject(new Error('The calendar API returned an error when reading calendars: ' + err));
         return;
       }
       var params = [];
@@ -258,7 +258,7 @@ adapter.importData = function(c8, conf, opts) {
                 // silently ignore
                 return;
               }
-              reject('The calendar API returned an error when reading events: ' + error);
+              reject(new Error('The calendar API returned an error when reading events: ' + error));
               return;
             }
             // console.log(response);
@@ -283,13 +283,33 @@ adapter.importData = function(c8, conf, opts) {
               bulk.push(event);
             }
             // console.log(bulk);
-            c8.bulk(bulk).then(function(result) {
-              console.log('Indexed ' + result.items.length + ' events in ' + result.took + ' ms.');
-              bulk = null;
-            }).catch(function(error) {
-              reject(error);
-              bulk = null;
-            });
+            if (bulk.length > 0) {
+              c8.bulk(bulk).then(function(result) {
+                if (result.errors) {
+                  var messages = [];
+                  for (var i=0; i<result.items.length; i++) {
+                    if (result.items[i].index.error) {
+                      messages.push(i + ': ' + result.items[i].index.error.reason);
+                    }
+                  }
+                  reject(new Error(messages.length + ' errors in bulk insert:\n ' + messages.join('\n ')));
+                  c8.release();
+                  bulk = null;
+                  return;
+                }
+                fulfill('Indexed ' + result.items.length + ' event documents in ' + result.took + ' ms.');
+                c8.release();
+                bulk = null;
+              }).catch(function(error) {
+                reject(error);
+                bulk = null;
+                c8.release();
+              });
+            }
+            else {
+              fulfill('No data available');
+              c8.release();
+            }
           });
         }
         fulfill('Checked ' + response.responses.length + ' calendars.');
