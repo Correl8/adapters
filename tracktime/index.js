@@ -110,20 +110,21 @@ adapter.types = [
   {
     name: 'tracktime',
     fields: {
-      id: 'string', // actually integer, stored as string for compatibility
+      id: 'keyword',
       timestamp: 'date',
       starttime: 'date',
       endtime: 'date',
       duration: 'integer',
       mainid: 'integer',
-      mainaction: 'string',
-      maincategory: 'string',
+      mainaction: 'keyword',
+      maincategory: 'keyword',
       sideid: 'integer',
-      sideaction: 'string',
-      sidecategory: 'string',
-      with: 'text',
+      sideaction: 'keyword',
+      sidecategory: 'keyword',
+      withid: 'integer',
+      with: 'keyword',
       usecomputer: 'boolean',
-      location: 'string',
+      location: 'keyword',
       locid: 'integer',
       description: 'text',
       rating: 'integer'
@@ -160,12 +161,12 @@ adapter.importData = function(c8, conf, opts) {
       }
       else if (resp && resp.timestamp) {
         var d = new Date(resp.timestamp);
-        lastConsumptionEnery = resp.cumulativeConsumptionEnergy;
         firstDate = new Date(d.getTime() + 1);
         console.log('Setting first time to ' + firstDate);
       }
       else {
-        firstDate = new Date(user.createdAt);
+        firstDate = new Date();
+        firstDate.setMonth(firstDate.getMonth() - 1);
         console.warn('No previously indexed data, setting first time to ' + firstDate);
       }
       if (opts.lastDate) {
@@ -193,8 +194,8 @@ adapter.importData = function(c8, conf, opts) {
         var data = JSON.parse(body);
         if (data && data.length) {
           var bulk = [];
-          for (var i=0; i<data.length; i++) {
-            bulk.push({index: {_index: c8._index, _type: c8._type, _id: data[i].id}});
+          for (var i=data.length-1; i>=0; i--) {
+            // bulk.push({index: {_index: c8._index, _type: c8._type, _id: data[i].id}});
             data[i].starttime = new Date(data[i].starttime);
             data[i].endtime = new Date(data[i].endtime);
             data[i].duration = (data[i].endtime - data[i].starttime)/1000;
@@ -207,29 +208,48 @@ adapter.importData = function(c8, conf, opts) {
             data[i].sidecategory = parents[data[i].sideid];
             data[i].locid = data[i].location;
             data[i].location = locs[data[i].location];
-            if (data[i]['with'] == 1) {
-              data[i]['with'] = 'alone';
+            data[i].withid = data[i]['with'];
+            if (data[i] == 1) {
+              data[i].withid = ['alone'];
             }
             else {
-              var a = [];
+              data[i]['with'] = [];
               for (var j=0; j<=6; j++) {
-               var val = j;
-               if (data[i]['with'] & Math.pow(2, (val-1))) {
-                a.push(withValues[j].toLowerCase());
-               }
+                if (data[i].withid & Math.pow(2, (j-1))) {
+                  data[i]['with'].push(withValues[j].toLowerCase());
+                }
               }
-              data[i]['with'] = a.join(' ');
             }
-            bulk.push(data[i]);
+            // split into 10 minute slices
+            var tenMinutes = 10 * 60 * 1000;
+            var start = data[i].starttime.getTime();
+            var end = data[i].endtime.getTime();
+            for (var t = start; t < end; t += tenMinutes) {
+              var copy = JSON.parse(JSON.stringify(data[i]));
+              var id = t + '-' + data[i].id;
+              copy.timestamp = t;
+              copy.starttime = t;
+              copy.endtime = t + tenMinutes;
+              copy.duration = tenMinutes / 1000;
+              bulk.push({index: {_index: c8._index, _type: c8._type, _id: id}});
+              bulk.push(copy);
+            }
             console.log(data[i].timestamp);
           }
           if (bulk.length > 0) {
             c8.bulk(bulk).then(function(result) {
+              if (result.errors) {
+                var messages = [];
+                for (var i=0; i<result.items.length; i++) {
+                  if (result.items[i].index.error) {
+                    messages.push(i + ': ' + result.items[i].index.error.reason);
+                  }
+                }
+                reject(new Error(messages.length + ' errors in bulk insert:\n ' + messages.join('\n ')));
+              }
               fulfill('Indexed ' + result.items.length + ' documents in ' + result.took + ' ms.');
-              c8.release();
             }).catch(function(error) {
               reject(error);
-              c8.release();
             });
           }
           else {
