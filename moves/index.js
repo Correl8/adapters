@@ -218,7 +218,7 @@ adapter.importData = function(c8, conf, opts) {
 function importData(c8, conf, firstDate, lastDate) {
   return new Promise(function (fulfill, reject){
     if (!firstDate) {
-      reject('No starting date...');
+      reject(new Error('No starting date...'));
       return;
     }
     if (lastDate.getTime() > (firstDate.getTime() + MAX_DAYS * MS_IN_DAY)) {
@@ -250,11 +250,26 @@ function importData(c8, conf, firstDate, lastDate) {
       // for (var i=0; i<bulk.length; i++) {
       //   console.log(JSON.stringify(bulk[i]));
       // }
-      c8.bulk(bulk).then(function(result) {
-        fulfill('Indexed ' + result.items.length + ' documents in ' + result.took + ' ms.');
-      }).catch(function(error) {
-        reject(error);
-      });
+      if (bulk.length > 0) {
+        c8.bulk(bulk).then(function(result) {
+          if (result.errors) {
+            var messages = [];
+            for (var i=0; i<result.items.length; i++) {
+              if (result.items[i].index.error) {
+                messages.push(i + ': ' + result.items[i].index.error.reason);
+              }
+            }
+            reject(new Error(messages.length + ' errors in bulk insert:\n ' + messages.join('\n ')));
+          }
+          fulfill('Indexed ' + result.items.length + ' documents in ' + result.took + ' ms.');
+        }).catch(function(error) {
+          reject(error);
+          bulk = null;
+        });
+      }
+      else {
+        fulfill('No data available');
+      }
     });
   });
 }
