@@ -110,7 +110,7 @@ adapter.importData = function(c8, conf, opts) {
     }
     sheets.spreadsheets.values.get(getParams, function(err, response) {
       if (err) {
-        reject('The API returned an error: ' + err);
+        reject(err);
         return;
       }
       var rows = response.values;
@@ -145,14 +145,26 @@ adapter.importData = function(c8, conf, opts) {
           bulk.push({index: {_index: c8._index, _type: c8._type, _id: row[0]}});
           bulk.push(values);
         }
-        // console.log(bulk);
-        c8.bulk(bulk).then(function(result) {
-          fulfill('Indexed ' + result.items.length + ' rows in ' + result.took + ' ms.');
-          bulk = null;
-        }).catch(function(error) {
-          reject(error);
-          bulk = null;
-        });
+        if (bulk.length > 0) {
+          c8.bulk(bulk).then(function(result) {
+            if (result.errors) {
+              var messages = [];
+              for (var i=0; i<result.items.length; i++) {
+                if (result.items[i].index.error) {
+                  messages.push(i + ': ' + result.items[i].index.error.reason);
+                }
+              }
+              reject(new Error(messages.length + ' errors in bulk insert:\n ' + messages.join('\n ')));
+            }
+            fulfill('Indexed ' + result.items.length + ' documents in ' + result.took + ' ms.');
+          }).catch(function(error) {
+            reject(error);
+            bulk = null;
+          });
+        }
+        else {
+          fulfill('No data available');
+        }
       }
     });
   });
