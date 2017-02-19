@@ -120,13 +120,26 @@ function getRecent(c8, lfm, params) {
         bulk.push(track);
       }
       // console.log(JSON.stringify(bulk, null, 2));
-      c8.bulk(bulk).then(function(result) {
-        fulfill('Indexed ' + result.items.length + ' items in ' + result.took + ' ms.');
-        bulk = null;
-      }).catch(function(error) {
-        reject(error);
-        bulk = null;
-      });
+      if (bulk.length > 0) {
+        c8.bulk(bulk).then(function(result) {
+          if (result.errors) {
+            var messages = [];
+            for (var i=0; i<result.items.length; i++) {
+              if (result.items[i].index.error) {
+                messages.push(i + ': ' + result.items[i].index.error.reason);
+              }
+            }
+            reject(new Error(messages.length + ' errors in bulk insert:\n ' + messages.join('\n ')));
+          }
+          fulfill('Indexed ' + result.items.length + ' documents in ' + result.took + ' ms.');
+        }).catch(function(error) {
+          reject(error);
+          bulk = null;
+        });
+      }
+      else {
+        fulfill('No data available');
+      }
     });
   });
 }
