@@ -95,8 +95,8 @@ adapter.importData = function(c8, conf, opts) {
         var qs = new QS()
         qs.login(conf.username, conf.password).then(function(data) {
           var deviceId = data.device_settings[0].device_id
-          Promise.all([getPresence(c8, qs, deviceId), getTrends(c8, qs, deviceId, firstDate, lastDate)]).then(function(results) {
-            fulfill(results.join('\n'));
+          Promise.all([getPresence(c8, qs, deviceId), getTrends(c8, qs, deviceId, firstDate, lastDate)]).then(function(messages) {
+            fulfill(messages.join('\n'));
           }).catch(function(error) {
             reject(error);
           });
@@ -134,7 +134,7 @@ function getPresence(c8, qs, deviceId) {
   return new Promise(function (fulfill, reject){
     qs.latest(deviceId).then(function(latest) {
       if (latest.error) {
-        reject('Could not index latest presence data: ' + latest.error);
+        reject(new Error('Could not index latest presence data: ' + latest.error));
       }
       var messages = [];
       if (latest.navigation_data && latest.navigation_data.length) {
@@ -214,7 +214,7 @@ function getTrends(c8, qs, deviceId, startTime, endTime) {
           fulfill('No trends available yet.');
         }
         else {
-          reject('Could not index trends: ' + trends.error);
+          reject(new Error('Could not index trends: ' + trends.error));
         }
       }
       else {
@@ -229,6 +229,15 @@ function getTrends(c8, qs, deviceId, startTime, endTime) {
         }
         if (bulk.length > 0) {
           c8.bulk(bulk).then(function(result) {
+            if (result.errors) {
+              var messages = [];
+              for (var i=0; i<result.items.length; i++) {
+                if (result.items[i].index.error) {
+                  messages.push(i + ': ' + result.items[i].index.error.reason);
+                }
+              }
+              reject(new Error(messages.length + ' errors in bulk insert:\n ' + messages.join('\n ')));
+            }
             fulfill('Indexed ' + result.items.length + ' trend documents in ' + result.took + ' ms.');
           }).catch(function(error) {
             reject(error);
