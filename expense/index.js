@@ -64,7 +64,7 @@ adapter.importData = function(c8, conf, opts) {
       var cookieJar = request.jar();
       return request({url: url, jar: cookieJar}, function(error, response, body) {
         if (error || !response || !body) {
-          reject('Error getting data: ' + JSON.stringify(response.body));
+          reject(new Error('Error getting data: ' + JSON.stringify(response.body)));
         }
         var data = JSON.parse(body);
         if (data && data.length) {
@@ -80,13 +80,30 @@ adapter.importData = function(c8, conf, opts) {
               console.log(dayData[j].date);
             }
           }
-          c8.bulk(bulk).then(function(result) {
+          if (bulk.length > 0) {
+            c8.bulk(bulk).then(function(result) {
+              if (result.errors) {
+                var messages = [];
+                for (var i=0; i<result.items.length; i++) {
+                  if (result.items[i].index.error) {
+                    messages.push(i + ': ' + result.items[i].index.error.reason);
+                  }
+                }
+                reject(new Error(messages.length + ' errors in bulk insert:\n ' + messages.join('\n ')));
+                c8.release();
+                return;
+              }
+              fulfill('Indexed ' + result.items.length + ' documents in ' + result.took + ' ms.');
+              c8.release();
+            }).catch(function(error) {
+              reject(error);
+              c8.release();
+            });
+          }
+          else {
+            fulfill('No data available');
             c8.release();
-            fulfill('Indexed ' + result.items.length + ' documents in ' + result.took + ' ms.');
-          }).catch(function(error) {
-            reject(error);
-            c8.release();
-          });
+          }
         }
         else {
           fulfill('No data available');
