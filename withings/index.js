@@ -173,7 +173,8 @@ function importData(c8, conf, firstDate, lastDate) {
           category: meta.cat,
           measures: obj[i].measures
         }
-        var id = meta.date + '-' + meta.cat;
+        // var id = meta.date + '-' + meta.cat;
+          var id = meta.date + '-' + obj[i].grpid + '-' + meta.cat;
         for (var j=0; j<obj[i].measures.length; j++) {
           var t = obj[i].measures[j].type;
           var v = obj[i].measures[j].value;
@@ -186,9 +187,20 @@ function importData(c8, conf, firstDate, lastDate) {
         bulk.push({index: {_index: c8._index, _type: c8._type, _id: id}});
         bulk.push(values);
         // console.log(values);
+        console.log(new Date(values.timestamp));
       }
       if (bulk.length > 0) {
+        // console.log(bulk);
         c8.bulk(bulk).then(function(result) {
+          if (result.errors) {
+            var messages = [];
+            for (var i=0; i<result.items.length; i++) {
+              if (result.items[i].index.error) {
+                messages.push(i + ': ' + result.items[i].index.error.reason);
+              }
+            }
+            reject(new Error(messages.length + ' errors in bulk insert:\n ' + messages.join('\n ')));
+          }
           fulfill('Indexed ' + result.items.length + ' documents in ' + result.took + ' ms.');
         }).catch(function(error) {
           reject(error);
