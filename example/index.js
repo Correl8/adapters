@@ -65,7 +65,7 @@ adapter.importData = function(c8, conf, opts) {
       var cookieJar = request.jar();
       request({url: url, jar: cookieJar}, function(error, response, body) {
         if (error || !response || !body) {
-          reject('Error getting data: ' + JSON.stringify(response.body));
+          reject(new Error('Error getting data: ' + JSON.stringify(response.body)));
         }
         var data = JSON.parse(body);
         if (data && data.length) {
@@ -83,6 +83,15 @@ adapter.importData = function(c8, conf, opts) {
           }
           return c8.bulk(bulk).then(function(result) {
             c8.release();
+            if (result.errors) {
+              var messages = [];
+              for (var i=0; i<result.items.length; i++) {
+                if (result.items[i].index.error) {
+                  messages.push(i + ': ' + result.items[i].index.error.reason);
+                }
+              }
+              reject(new Error(messages.length + ' errors in bulk insert:\n ' + messages.join('\n ')));
+            }
             fulfill('Indexed ' + result.items.length + ' documents in ' + result.took + ' ms.');
           }).catch(function(error) {
             c8.release();
