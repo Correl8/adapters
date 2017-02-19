@@ -167,14 +167,28 @@ adapter.importData = function(c8, conf, opts) {
               bulk.push(commit);
             }
             // console.log(JSON.stringify(bulk, null, 2));
+            // console.log(bulk.length);
             if (bulk.length > 0) {
               c8.bulk(bulk).then(function(result) {
-                bulk = null;
-                console.log('Indexed ' + result.items.length + ' commits in ' + result.took + ' ms.');
+                if (result.errors) {
+                  var messages = [];
+                  for (var i=0; i<result.items.length; i++) {
+                    if (result.items[i].index.error) {
+                      messages.push(i + ': ' + result.items[i].index.error.reason);
+                    }
+                  }
+                  reject(new Error(messages.length + ' errors in bulk insert:\n ' + messages.join('\n ')));
+                  c8.release();
+                  return;
+                }
+                console.log('Indexed ' + result.items.length + ' commit documents in ' + result.took + ' ms.');
               }).catch(function(error) {
-                bulk = null;
-                reject(error);
+                console.error(error);
+                c8.release();
               });
+            }
+            else {
+              // console.log('No data available');
             }
           });
         }
