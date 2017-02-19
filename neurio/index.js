@@ -10,7 +10,7 @@ var MIN_POWER = 400;
 // maximum granularity is 5 minutes
 var GRANULARITY = 'minutes';
 var FREQUENCY = 5;
-var lastConsumptionEnery;
+var lastConsumptionEnergy;
 
 adapter.sensorName = 'neurio';
 
@@ -117,7 +117,7 @@ adapter.importData = function(c8, conf, opts) {
             }
             else if (resp && resp.timestamp) {
               var d = new Date(resp.timestamp);
-              lastConsumptionEnery = resp.cumulativeConsumptionEnergy;
+              lastConsumptionEnergy = resp.cumulativeConsumptionEnergy;
               firstDate = new Date(d.getTime() + 1);
               console.log('Setting first time to ' + firstDate);
             }
@@ -212,16 +212,16 @@ function getSamplesHistoryPage(c8, client, sensorId, start, end, granularity, fr
     var bulk = [];
     for (var i=0; i<events.length; i++) {
       var values = events[i];
-      if (!lastConsumptionEnery) {
-        lastConsumptionEnery = values.consumptionEnergy;
+      if (!lastConsumptionEnergy) {
+        lastConsumptionEnergy = values.consumptionEnergy;
         // console.log(values.timestamp + ' - skipping');
         continue; // will lose some power readings?
         values.cumulativeConsumptionEnergy = null;
         values.consumptionEnergy = null;
       }
       values.cumulativeConsumptionEnergy = values.consumptionEnergy;
-      values.consumptionEnergy = values.consumptionEnergy - lastConsumptionEnery;
-      lastConsumptionEnery = values.cumulativeConsumptionEnergy;
+      values.consumptionEnergy = values.consumptionEnergy - lastConsumptionEnergy;
+      lastConsumptionEnergy = values.cumulativeConsumptionEnergy;
       var power = values.consumptionPower || 0;
       if (values.generationPower) {
         power -= values.generationPower;
