@@ -50,7 +50,6 @@ adapter.importData = function(c8, conf, opts) {
       }
       else if (resp && resp.timestamp) {
         var d = new Date(resp.timestamp);
-        lastConsumptionEnery = resp.cumulativeConsumptionEnergy;
         firstDate = new Date(d.getTime() + 1);
         console.log('Setting first time to ' + firstDate);
       }
