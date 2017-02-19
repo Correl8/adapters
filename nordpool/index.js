@@ -78,8 +78,9 @@ adapter.importData = function(c8, conf, opts) {
         params.firstDate = firstDate;
       }
       prices.hourly(params, function(error, data) {
-        if (error || !data) {
-          reject('Error getting data: ' + JSON.stringify(error));
+        if (error) {
+          reject(error);
+          return;
         }
         // console.log(JSON.stringify(data, null, 2));
         if (data && data.length) {
@@ -93,10 +94,26 @@ adapter.importData = function(c8, conf, opts) {
             bulk.push(values);
             console.log(id + ': ' + row.value);
           }
-          c8.bulk(bulk).then(function(result) {
-            fulfill('Indexed ' + result.items.length + ' documents in ' + result.took + ' ms.');
-            bulk = null;
-          });
+          if (bulk.length > 0) {
+            c8.bulk(bulk).then(function(result) {
+              if (result.errors) {
+                var messages = [];
+                for (var i=0; i<result.items.length; i++) {
+                  if (result.items[i].index.error) {
+                    messages.push(i + ': ' + result.items[i].index.error.reason);
+                  }
+                }
+                reject(new Error(messages.length + ' errors in bulk insert:\n ' + messages.join('\n ')));
+              }
+              fulfill('Indexed ' + result.items.length + ' documents in ' + result.took + ' ms.');
+            }).catch(function(error) {
+              reject(error);
+              bulk = null;
+            });
+          }
+          else {
+            fulfill('No data available');
+          }
         }
         else {
           fulfill(JSON.stringify(data.Rows, null, 2));
