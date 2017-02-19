@@ -22,8 +22,8 @@ adapter.types = [
       comment: "text",
       start_at: "date",
       stop_at: "date",
-      value: "date",
-      sub_value: "date",
+      value: "integer",
+      sub_value: "float",
       calm_duration: "integer",
       focus_duration: "integer",
       tense_duration: "integer",
@@ -202,7 +202,7 @@ adapter.importData = function(c8, conf, opts) {
                 bulk.push(obj);
               }
               if (bulk.length > 0) {
-                c8.bulk(bulk).then(function(result) {
+                  c8.bulk(bulk).then(function(result) {
                   console.log('Indexed ' + result.items.length + ' events in ' + result.took + ' ms.');
                 }).catch(function(error) {
                   reject(error);
@@ -215,9 +215,17 @@ adapter.importData = function(c8, conf, opts) {
             date.setTime(date.getTime() + MS_IN_DAY);
           }
 
-
           if (streakBulk.length > 0) {
             c8.bulk(streakBulk).then(function(result) {
+              if (result.errors) {
+                var messages = [];
+                for (var i=0; i<result.items.length; i++) {
+                  if (result.items[i].index.error) {
+                    messages.push(i + ': ' + result.items[i].index.error.reason);
+                  }
+                }
+                reject(new Error(messages.length + ' errors in bulk insert:\n ' + messages.join('\n ')));
+              }
               fulfill('Indexed ' + result.items.length + ' streak documents in ' + result.took + ' ms.');
             }).catch(function(error) {
               reject(error);
