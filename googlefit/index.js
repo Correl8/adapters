@@ -172,7 +172,7 @@ adapter.importData = function(c8, conf, opts) {
       var fit = google.fitness('v1');
       fit.users.dataSources.list({auth: oauth2Client, userId: 'me'}, function(err, resp) {
         if (err) {
-          reject('The fitness API returned an error when reading data sources: ' + err);
+          reject(new Error('The fitness API returned an error when reading data sources: ' + err));
           return;
         }
         // console.log(resp);
@@ -212,7 +212,7 @@ adapter.importData = function(c8, conf, opts) {
           // console.log(params);
           fit.users.dataSources.datasets.get(params, function(err, resp) {
             if (err) {
-              reject('The fitness API returned an error when reading data set: ' + err);
+              reject(new Error('The fitness API returned an error when reading data set: ' + err));
               return;
             }
             if (resp.point && resp.point.length > 0) {
@@ -279,21 +279,25 @@ adapter.importData = function(c8, conf, opts) {
                 bulk.push(values);
               }
               // console.log(JSON.stringify(bulk, null, 2));
+              if (bulk.length > 0) {
                 c8.bulk(bulk).then(function(result) {
-  		  if (result.errors) {
-  		      for (var i=0; i<result.items; i++) {
-  			  if (result.items[i].error) {
-  			      console.trace(result.items[i]);
-  			  }
-  		      }
-  		  }
-  		// console.log(result);
-  		console.log('Indexed ' + result.items.length + ' items in ' + result.took + ' ms.');
-                bulk = null;
-              }).catch(function(error) {
-                console.trace(error);
-                bulk = null;
-              });
+                  if (result.errors) {
+                    var messages = [];
+                    for (var i=0; i<result.items.length; i++) {
+                      if (result.items[i].index.error) {
+                        messages.push(i + ': ' + result.items[i].index.error.reason);
+                      }
+                    }
+                    console.error(messages.length + ' errors in bulk insert:\n ' + messages.join('\n '));
+                  }
+                  console.log('Indexed ' + result.items.length + ' documents in ' + result.took + ' ms.');
+                }).catch(function(error) {
+                  console.error(error);
+                });
+              }
+              else {
+                console.log('No data available');
+              }
             }
             else {
               var sd = new Date(resp.minStartTimeNs/1000000);
