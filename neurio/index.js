@@ -187,20 +187,34 @@ function getAppliancePage(c8, client, locId, firstDate, lastDate, minPower, perP
       bulk.push({index: {_index: c8.type(applianceType)._index, _type: c8.type(applianceType)._type, _id: id}});
       bulk.push(values);
     }
-    c8.type(applianceType).bulk(bulk).then(function(result) {
-      console.log('Indexed ' + result.items.length + ' appliance events in ' + result.took + ' ms.');
-      bulk = null;
-      if (events.length == perPage) {
-        // page was full, request the next page (recursion!)
-        page++;
-        if (page <= MAX_PAGES) {
-          getAppliancePage(c8, client, locId, firstDate, lastDate, minPower, perPage, page);
+    if (bulk.length > 0) {
+      c8.type(applianceType).bulk(bulk).then(function(result) {
+        if (result.errors) {
+          var messages = [];
+          for (var i=0; i<result.items.length; i++) {
+            if (result.items[i].index.error) {
+              messages.push(i + ': ' + result.items[i].index.error.reason);
+            }
+          }
+          throw(new Error(messages.length + ' errors in bulk insert:\n ' + messages.join('\n ')));
         }
-      }
-    }).catch(function(error) {
-      console.trace(error);
-      bulk = null;
-    });
+        console.log('Indexed ' + result.items.length + ' appliance events in ' + result.took + ' ms.');
+        bulk = null;
+        if (events.length == perPage) {
+          // page was full, request the next page (recursion!)
+          page++;
+          if (page <= MAX_PAGES) {
+            getAppliancePage(c8, client, locId, firstDate, lastDate, minPower, perPage, page);
+          }
+        }
+      }).catch(function(error) {
+        console.trace(error);
+        bulk = null;
+      });
+    }
+    else {
+      console.log('No appliance events indexed.');
+    }
   }).catch(function(error) {
     console.trace(error);
   });
@@ -237,20 +251,34 @@ function getSamplesHistoryPage(c8, client, sensorId, start, end, granularity, fr
       bulk.push(values);
       // console.log(values);
     }
-    c8.type(sampleType).bulk(bulk).then(function(result) {
-      console.log('Indexed ' + result.items.length + ' power readings in ' + result.took + ' ms.');
-      bulk = null;
-      if (events.length == perPage) {
-        // page was full, request the next page (recursion!)
-        page++;
-        if (page <= MAX_PAGES) {
-          getSamplesHistoryPage(c8, client, sensorId, start, end, granularity, frequency, perPage, page);
+    if (bulk.length > 0) {
+      c8.type(sampleType).bulk(bulk).then(function(result) {
+        if (result.errors) {
+          var messages = [];
+          for (var i=0; i<result.items.length; i++) {
+            if (result.items[i].index.error) {
+              messages.push(i + ': ' + result.items[i].index.error.reason);
+            }
+          }
+          throw(new Error(messages.length + ' errors in bulk insert:\n ' + messages.join('\n ')));
         }
-      }
-    }).catch(function(error) {
-      console.trace(error);
-      bulk = null;
-    });
+        console.log('Indexed ' + result.items.length + ' power readings in ' + result.took + ' ms.');
+        bulk = null;
+        if (events.length == perPage) {
+          // page was full, request the next page (recursion!)
+          page++;
+          if (page <= MAX_PAGES) {
+            getSamplesHistoryPage(c8, client, sensorId, start, end, granularity, frequency, perPage, page);
+          }
+        }
+      }).catch(function(error) {
+        console.trace(error);
+        bulk = null;
+      });
+    }
+    else {
+      console.log('No power readings indexed.');
+    }
   }).catch(function(error) {
     console.trace(error);
   });
@@ -276,13 +304,27 @@ function getEnergyStats(c8, client, sensorId, start, end, granularity, frequency
       bulk.push({index: {_index: c8.type(energyType)._index, _type: c8.type(energyType)._type, _id: id}});
       bulk.push(values);
     }
-    c8.type(energyType).bulk(bulk).then(function(result) {
-      console.log('Indexed ' + result.items.length + ' energy stats in ' + result.took + ' ms.');
-      bulk = null;
-    }).catch(function(error) {
-      console.trace(error);
-      bulk = null;
-    });
+    if (bulk.length > 0) {
+      c8.type(energyType).bulk(bulk).then(function(result) {
+        if (result.errors) {
+          var messages = [];
+          for (var i=0; i<result.items.length; i++) {
+            if (result.items[i].index.error) {
+              messages.push(i + ': ' + result.items[i].index.error.reason);
+            }
+          }
+          throw(new Error(messages.length + ' errors in bulk insert:\n ' + messages.join('\n ')));
+        }
+        console.log('Indexed ' + result.items.length + ' energy stats in ' + result.took + ' ms.');
+        bulk = null;
+      }).catch(function(error) {
+        console.trace(error);
+        bulk = null;
+      });
+    }
+    else {
+      console.log('No energy stats indexed.');
+    }
   }).catch(function(error) {
     console.trace(error);
   });
