@@ -20,7 +20,9 @@ adapter.types = [
       "stepsOURA": "integer",
       "caloriesOURA": "integer",
       "stepsSpire": "integer",
-      "caloriesSpire": "integer"
+      "caloriesSpire": "integer",
+      "stepsPolar": "integer",
+      "caloriesPolar": "integer"
     }
   }
 ];
@@ -127,7 +129,7 @@ adapter.importData = function(c8, conf, opts) {
             console.warn('Could not parse timestamp on row %d: %s', i, timeValue);
             continue;
           }
-          if (!row[1] && !row[2] && !row[3] && !row[4] && !row[5] && !row[6]) {
+          if (!row[1] && !row[2] && !row[3] && !row[4] && !row[5] && !row[6] && !row[7] && !row[8]) {
             // don't import rows without values
             continue;
           }
@@ -139,7 +141,9 @@ adapter.importData = function(c8, conf, opts) {
             stepsOURA: row[3] ? parseInt(row[3].replace(/\s/, '')) : null,
             caloriesOURA: row[4] ? parseInt(row[4].replace(/\s/, '')) : null,
             stepsSpire: row[5] ? parseInt(row[5].replace(/\s/, '')) : null,
-            caloriesSpire: row[6] ? parseInt(row[6].replace(/\s/, '')) : null
+              caloriesSpire: row[6] ? parseInt(row[6].replace(/\s/, '')) : null,
+            stepsPolar: row[7] ? parseInt(row[7].replace(/\s/, '')) : null,
+            caloriesPolar: row[7] ? parseInt(row[8].replace(/\s/, '')) : null
           }
           console.log(row.join(', '));
           bulk.push({index: {_index: c8._index, _type: c8._type, _id: row[0]}});
