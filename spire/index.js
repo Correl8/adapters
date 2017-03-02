@@ -156,6 +156,9 @@ adapter.importData = function(c8, conf, opts) {
             var obj = data[i];
             var id = obj.start_at + '-' + 'streak';
             obj.duration = obj.stop_at - obj.start_at;
+            if (obj.value) {
+              obj[obj.type + '_duration'] = obj.value;
+	    }
             obj[obj.type + '_duration'] = obj.value;
             if (obj.type == 'activity') {
               obj.steps = obj.sub_value;
@@ -211,6 +214,8 @@ adapter.importData = function(c8, conf, opts) {
               else {
                 fulfill('No events');
               }
+            }).catch(function(error) {
+              reject(error);
             });
             date.setTime(date.getTime() + MS_IN_DAY);
           }
@@ -231,11 +236,14 @@ adapter.importData = function(c8, conf, opts) {
               reject(error);
             });
           }
+        }).catch(function(error) {
+          reject(error);
         });
-
+      }).catch(function(error) {
+        reject(error);
       });
     }).catch(function(error) {
-      console.trace(error);
+      reject(error);
     });
   });
 };
