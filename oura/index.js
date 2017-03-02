@@ -286,6 +286,8 @@ function importData(c8, conf, firstDate, lastDate) {
           getReadiness(c8, client, start, end),
         ]).then(function(values){
             fulfill(values.join('\n'));
+        }).catch(function(error){
+          reject(error)
         });
       }).catch(function(error){
         reject(error)
@@ -305,7 +307,7 @@ function getSleep(c8, client, start, end) {
         // var summaryDate = obj[i].summary_date;
         var summaryDate = moment(obj[i].bedtime_end).format('YYYY-MM-DD');
         console.log(summaryDate);
-        var sleepStateData = obj[i].hypnogram_5min.split("");
+        var sleepStateData = obj[i].hypnogram_5min ? obj[i].hypnogram_5min.split("") : [];
         var sleepHRData = obj[i].hr_10min;
         obj[i].timestamp = summaryDate;
         var id = summaryDate + obj[i].period_id;
