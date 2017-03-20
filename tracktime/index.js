@@ -113,7 +113,10 @@ adapter.types = [
       id: 'keyword',
       timestamp: 'date',
       starttime: 'date',
+      starthour: 'integer',
       endtime: 'date',
+      sliceid: 'integer',
+      slice: 'keyword',
       duration: 'integer',
       mainid: 'integer',
       mainaction: 'keyword',
@@ -227,12 +230,23 @@ adapter.importData = function(c8, conf, opts) {
             for (var t = start; t < end; t += tenMinutes) {
               var copy = JSON.parse(JSON.stringify(data[i]));
               var id = t + '-' + data[i].id;
+              var sliceTime = new Date(t);
+              var startHour = sliceTime.getHours();
+              var startMinute = sliceTime.getMinutes();
+              copy.slice = [startHour, startMinute].join(':');
+              if (startMinute == 0) {
+                copy.slice += '0';
+              }
+              var idTime = startHour + startMinute/60;
+              copy.sliceid = Math.round((idTime + (idTime >= 4 ? -4 : 20)) * 6);
               copy.timestamp = t;
               copy.starttime = t;
+              copy.starthour = startHour;
               copy.endtime = t + tenMinutes;
               copy.duration = tenMinutes / 1000;
               bulk.push({index: {_index: c8._index, _type: c8._type, _id: id}});
               bulk.push(copy);
+              // console.log(JSON.stringify(copy.sliceId) + ': ' + sliceTime);
             }
             console.log(data[i].timestamp);
           }
