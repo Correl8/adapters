@@ -138,10 +138,10 @@ adapter.importData = function(c8, conf, opts) {
     var redirectUrl = conf.installed.redirect_uris[0];
     var auth = new googleAuth();
     var oauth2Client = new auth.OAuth2(clientId, clientSecret, redirectUrl);
+    oauth2Client.credentials = conf.credentials;
     var firstDate = new Date();
     firstDate.setTime(firstDate.getTime() - MS_IN_DAY);
     var lastDate = opts.lastDate || new Date();
-    oauth2Client.credentials = conf.credentials;
     c8.type(adapter.types[0].name).search({
       _source: ['timestamp'],
       size: 1,
