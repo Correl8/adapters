@@ -1,6 +1,6 @@
 var request = require('request');
 
-var MAX_DAYS = 30;
+var MAX_DAYS = 31;
 var MS_IN_DAY = 24 * 60 * 60 * 1000;
 
 var adapter = {};
