@@ -84,7 +84,7 @@ adapter.importData = function(c8, conf, opts) {
           var bulk = [];
           for (var i=0; i<data.length; i++) {
             var id = data[i][0] + '-' + data[i][3]; // unique enough?
-            var tz = new Date().getTimezoneOffset();
+            var tz = new Date(data[i][0]).getTimezoneOffset();
             var d = new Date(data[i][0]).getTime() + (tz * 60 * 1000);
             var dString = new Date(d).toISOString();
             bulk.push({index: {_index: c8._index, _type: c8._type, _id: id}});
