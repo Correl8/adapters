@@ -229,7 +229,7 @@ adapter.importData = function(c8, conf, opts) {
             var end = data[i].endtime.getTime();
             for (var t = start; t < end; t += tenMinutes) {
               var copy = JSON.parse(JSON.stringify(data[i]));
-              var id = t + '-' + data[i].id;
+              // var id = t + '-' + data[i].id;
               var sliceTime = new Date(t);
               var startHour = sliceTime.getHours();
               var startMinute = sliceTime.getMinutes();
@@ -244,7 +244,7 @@ adapter.importData = function(c8, conf, opts) {
               copy.starthour = startHour;
               copy.endtime = t + tenMinutes;
               copy.duration = tenMinutes / 1000;
-              bulk.push({index: {_index: c8._index, _type: c8._type, _id: id}});
+              bulk.push({index: {_index: c8._index, _type: c8._type, _id: t}});
               bulk.push(copy);
               // console.log(JSON.stringify(copy.sliceId) + ': ' + sliceTime);
             }
