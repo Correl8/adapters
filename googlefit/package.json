@@ -5,7 +5,8 @@
   "main": "index.js",
   "dependencies": {
     "correl8-cli": "^0.1.0",
-    "googleapis": "^16.0.0",
+    "google-fit-activity-types": "^0.1.0",
+    "googleapis": "^19.0.0",
     "path": "^0.12.7",
     "prompt": "^1.0.0"
   },
