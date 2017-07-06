@@ -4,8 +4,8 @@
   "description": "Import data from Nordpool into Correl8.me",
   "main": "index.js",
   "dependencies": {
-    "correl8-cli": "^0.1.0",
-    "nordpool": "^1.0.0"
+    "correl8-cli": "^0.1.1",
+    "nordpool": "^2.0.0"
   },
   "devDependencies": {},
   "scripts": {
