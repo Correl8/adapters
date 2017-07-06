@@ -1,0 +1,16 @@
+{
+  "name": "correl8-adapter-googlesearch",
+  "version": "1.0.0",
+  "description": "Import data from Google search history (Takeout) into Correl8.me",
+  "main": "index.js",
+  "dependencies": {
+    "correl8-cli": "^0.1.0",
+    "glob": "^7.1.2"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "start": "node node_modules/correl8-cli/app.js -a ../../index.js"
+  },
+  "author": "Samuel Rinnetmäki <samuel@iki.fi>",
+  "license": "ISC"
+}
