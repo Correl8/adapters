@@ -122,7 +122,7 @@ adapter.importData = function(c8, conf, opts) {
 */
 
   return new Promise(function (fulfill, reject){
-    c8.type(eventIndex).search({
+    c8.type(streakIndex).search({
       _source: ['timestamp'],
       size: 1,
       sort: [{'timestamp': 'desc'}],
@@ -192,7 +192,7 @@ adapter.importData = function(c8, conf, opts) {
           }
           console.log('Setting end date to ' + lastDate);
 
-          var date = firstDate;
+          let date = firstDate;
           while (date < lastDate) {
             console.log(date);
             client.events(date).then(function(data) {
@@ -201,18 +201,20 @@ adapter.importData = function(c8, conf, opts) {
                 var obj = data[i];
                 var id = obj.timestamp + '-' + 'events';
                 obj.timestamp = new Date(obj.timestamp * 1000);
+                // console.log(obj.timestamp);
                 bulk.push({index: {_index: c8.type(eventIndex)._index, _type: c8._type, _id: id}});
                 bulk.push(obj);
               }
               if (bulk.length > 0) {
-                  c8.bulk(bulk).then(function(result) {
+                c8.bulk(bulk).then(function(result) {
                   console.log('Indexed ' + result.items.length + ' events in ' + result.took + ' ms.');
                 }).catch(function(error) {
                   reject(error);
                 });
               }
               else {
-                fulfill('No events');
+                console.log('No events');
+                // fulfill('No events');
               }
             }).catch(function(error) {
               reject(error);
