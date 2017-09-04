@@ -129,9 +129,10 @@ adapter.importData = function(c8, conf, opts) {
       oauth2Client.credentials = conf.credentials;
       drive.files.list({
         auth: oauth2Client,
-        spaces: drive,
+        spaces: 'drive',
         q: "'" + conf.inputDir + "' in parents and trashed != true and (mimeType='text/csv' or mimeType='text/comma-separated-values')",
         pageSize: MAX_FILES,
+        orderBy: 'modifiedTime desc',
         fields: "files(id, name, webContentLink)"
       }, function(err, response) {
         if (err) {
@@ -343,7 +344,7 @@ function prepareRow(data, fileName, sessionId) {
         data['Device Time'] = deviceTime.valueOf();
       }
       else {
-        reject(new Error(data['Device Time'] + ' is not valid dateTime in ' + fileName + '!'));
+        throw(new Error(data['Device Time'] + ' is not valid dateTime in ' + fileName + '!'));
         return [null, sessionId];
       }
     }
