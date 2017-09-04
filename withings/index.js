@@ -174,7 +174,7 @@ function importData(c8, conf, firstDate, lastDate) {
           measures: obj[i].measures
         }
         // var id = meta.date + '-' + meta.cat;
-          var id = meta.date + '-' + obj[i].grpid + '-' + meta.cat;
+        var id = meta.date + '-' + obj[i].grpid + '-' + meta.cat;
         for (var j=0; j<obj[i].measures.length; j++) {
           var t = obj[i].measures[j].type;
           var v = obj[i].measures[j].value;
