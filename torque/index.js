@@ -9,10 +9,11 @@ const request = require('request');
 
 const adapter = {};
 
-const MAX_FILES = 5;
+// default limit 1000 queries per user per 100 seconds
+// one file uses at least 1 get and 1 update
+const MAX_FILES = 10;
 
 const SCOPES = ['https://www.googleapis.com/auth/drive'];
-const DRIVE_DOWNLOAD_URL = 'https://drive.google.com/uc?export=download&id=';
 
 const csvParserOpts = {
   columns: true,
@@ -129,7 +130,7 @@ adapter.importData = function(c8, conf, opts) {
       drive.files.list({
         auth: oauth2Client,
         spaces: drive,
-        q: "'" + conf.inputDir + "' in parents and mimeType='text/comma-separated-values'",
+        q: "'" + conf.inputDir + "' in parents and trashed != true and (mimeType='text/csv' or mimeType='text/comma-separated-values')",
         pageSize: MAX_FILES,
         fields: "files(id, name, webContentLink)"
       }, function(err, response) {
@@ -283,7 +284,7 @@ function indexCSV(fileName, reader, c8) {
       return;
     }).on('end', function() {
       if (bulk.length > 0) {
-        // console.log(JSON.stringify(bulk));
+        // console.log(JSON.stringify(bulk, null, 1));
         // return;
         c8.bulk(bulk).then(function(result) {
           if (result.errors) {
