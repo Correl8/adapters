@@ -1,5 +1,3 @@
-const fs = require('fs');
-const glob = require("glob");
 const JSONStream = require('JSONStream');
 const google = require('googleapis');
 const googleAuth = require('google-auth-library');
@@ -7,7 +5,6 @@ const unzip = require('unzip-stream');
 const prompt = require('prompt');
 
 const SCOPES = ['https://www.googleapis.com/auth/drive'];
-const DRIVE_DOWNLOAD_URL = 'https://drive.google.com/uc?export=download&id=';
 
 const MAX_FILES = 10;
 const MAX_BULK_BATCH = 10000;
@@ -155,6 +152,7 @@ adapter.importData = function(c8, conf, opts) {
             fileId: file.id,
             alt: 'media'
           })
+          .setMaxListeners(MAX_FILES)
           .pipe(unzip.Parse())
           .on('entry', function (entry) {
             var zipEntry = entry.path;
@@ -165,6 +163,7 @@ adapter.importData = function(c8, conf, opts) {
             console.log('Processing ' + zipEntry);
             stream = entry;
             stream.pipe(parse)
+            .setMaxListeners(0)
             .on('data', function(data) {
               // console.log(JSON.stringify(data));
               data.timestamp = new Date(Number(data.timestampMs));
