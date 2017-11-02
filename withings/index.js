@@ -35,7 +35,7 @@ adapter.types = [
     name: indexName,
     fields: {
       "timestamp": "date",
-      measures: {
+      "measures": {
         "value": "float",
         "type": "integer",
         "unit": "integer",
