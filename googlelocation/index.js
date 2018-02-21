@@ -1,12 +1,17 @@
 const JSONStream = require('JSONStream');
-const google = require('googleapis');
-const googleAuth = require('google-auth-library');
-const unzip = require('unzip-stream');
+const {google} = require('googleapis');
+const compressing = require('compressing');
+// const unzip = require('unzip-stream');
+const eos = require('end-of-stream');
 const prompt = require('prompt');
+const fs = require('fs');
+const request = require('request');
+
 
 const SCOPES = ['https://www.googleapis.com/auth/drive'];
 
-const MAX_FILES = 10;
+const MAX_FILES = 2;
+const MAX_ZIP_ENTRIES = 10;
 const MAX_BULK_BATCH = 10000;
 // const BULK_BATCH_MS = 2500;
 
@@ -65,7 +70,7 @@ adapter.storeConfig = function(c8, result) {
         Object.assign(conf, JSON.parse(content));
         // console.log(conf);
         c8.config(conf).then(function(){
-          var auth = new googleAuth();
+          var auth = google.auth;
           var clientSecret = conf.installed.client_secret;
           var clientId = conf.installed.client_id;
           var redirectUrl = conf.installed.redirect_uris[0];
@@ -118,25 +123,26 @@ adapter.importData = function(c8, conf, opts) {
       return;
     }
     var drive = google.drive('v3');
-    var auth = new googleAuth();
+    var auth = google.auth;
     var clientSecret = conf.installed.client_secret;
     var clientId = conf.installed.client_id;
     var redirectUrl = conf.installed.redirect_uris[0];
     var oauth2Client = new auth.OAuth2(clientId, clientSecret, redirectUrl);
-    let parse = JSONStream.parse('locations.*');
     oauth2Client.credentials = conf.credentials;
+    // console.log(JSON.stringify(conf.credentials));
     drive.files.list({
       auth: oauth2Client,
       spaces: drive,
-      q: "'" + conf.inputDir + "' in parents and mimeType='application/x-zip'",
+      q: "trashed != true and '" + conf.inputDir + "' in parents and mimeType='application/x-gtar'",
       pageSize: MAX_FILES,
-      fields: "files(id, name, webContentLink)"
+      fields: "files(id, name)"
     }, function(err, response) {
       if (err) {
-        reject(err);
+        reject(new Error(err));
         return;
       }
-      var files = response.files;
+      // console.log(response.data.files);
+      var files = response.data.files;
       if (files.length <= 0) {
         fulfill('No Takeout archives found in Drive folder ' + conf.inputDir);
       }
@@ -146,24 +152,78 @@ adapter.importData = function(c8, conf, opts) {
           let file = files[i];
           let fileName = file.name;
           let bulk = [];
-          console.log('Processing ' + fileName);
-          drive.files.get({
+          console.log('Processing file ' + i + ': ' + fileName);
+          
+/*
+          stream = drive.files.get({
             auth: oauth2Client,
             fileId: file.id,
             alt: 'media'
+          });
+*/
+          // temporary workaround
+          let oauth = {
+            consumer_key: clientId,
+            consumer_secret: clientSecret,
+            token: conf.credentials.access_token
+          }
+          let url = 'https://www.googleapis.com/drive/v3/files/' + file.id + '?alt=media';
+          stream = request.get({url: url, headers: {'Authorization': 'Bearer ' + oauth2Client.credentials.access_token}});
+          if (!stream) {
+            console.error('stream failed for file ' + file.id + '!');
+            continue;
+          }
+          eos(stream, function(err) {
+            if (err) {
+              return console.log('stream had an error or closed early');
+            }
+            if (finishedBatches > 0) {
+              var updateParams = {
+                auth: oauth2Client,
+                fileId: file.id,
+                addParents: conf.outputDir,
+                removeParents: conf.inputDir,
+                fields: 'id, parents'
+              };
+              drive.files.update(updateParams, function(err, updated) {
+                if(err) {
+                  reject(new Error(err));
+                  return;
+                }
+                else {
+                  fulfill('Moved ' + file.name + ' from ' + conf.inputDir + ' to ' + conf.outputDir);
+                }
+              });
+            }
+            else {
+              console.log('No location history in ' + file.name);
+            }
+          });
+          stream
+          .setMaxListeners(MAX_ZIP_ENTRIES)
+          .on('error', function (error) {
+            console.error(new Error('Stream error: ' + error));
+            return;
           })
-          .setMaxListeners(MAX_FILES)
-          .pipe(unzip.Parse())
-          .on('entry', function (entry) {
-            var zipEntry = entry.path;
-            if (zipEntry.indexOf('index.html') >= 0) {
-              // console.log('Skipping ' + zipEntry);
+          .pipe(new compressing.tgz.UncompressStream())
+          .on('error', function (error) {
+            console.error(new Error('JSONstream error: ' + error));
+            return;
+          })
+          .on('entry', function(header, substream, next) {
+            if (header.type != 'file' || header.name.indexOf('.json') < 0) {
+              console.log('Skipping ' + header.name);
               return;
             }
-            console.log('Processing ' + zipEntry);
-            stream = entry;
-            stream.pipe(parse)
-            .setMaxListeners(0)
+            console.log(header.mtime + ': ' + header.name + ' (' + Math.round(header.size/1024) + ' kB)');
+            eos(substream, function(err) {
+              if (err) {
+                return console.log('stream had an error or closed early');
+              }
+              console.log('stream has ended', this === substream);
+            });
+            let parse = JSONStream.parse('locations.*');
+            substream.pipe(parse)
             .on('data', function(data) {
               // console.log(JSON.stringify(data));
               data.timestamp = new Date(Number(data.timestampMs));
@@ -188,43 +248,24 @@ adapter.importData = function(c8, conf, opts) {
               }
             })
             .on('end', function() {
-              console.log('Last batch of ' + zipEntry + '!');
+              console.log('Last batch of ' + header.name + '!');
               if (bulk.length > 0) {
                 results.push(indexBulk(bulk, conf, c8).catch(reject));
               }
-              // fulfill(results);
+              // there is no next entry
+              // next();
             })
-            .on('error', reject);
+            .on('error', (error) => {
+              console.log('Error processing ' + header.name);
+              console.log(new Error(error));
+              // reject(error);
+            });
           })
           .on('end', function() {
-            if (finishedBatches > 0) {
-              // wait a while before moving the file!
-              setTimeout(function() {
-                var updateParams = {
-                  auth: oauth2Client,
-                  fileId: file.id,
-                  addParents: conf.outputDir,
-                  removeParents: conf.inputDir,
-                  fields: 'id, parents'
-                };
-                drive.files.update(updateParams, function(err, updated) {
-                  if(err) {
-                    reject(err);
-                    return;
-                  }
-                  else {
-                    console.log('Moved ' + file.name + ' from ' + conf.inputDir + ' to ' + conf.outputDir);
-                  }
-                });
-              }, 2000);
-            }
-            else {
-              console.log('No location history in ' + file.name);
-            }
           })
           .on('error', reject);
         }
-        console.log('Found ' + files.length + ' files in ' + conf.inputDir);
+        console.log('Found ' + files.length + ' file ' + (files.length == 1 ? '' : 's') + ' in ' + conf.inputDir);
       }
     });
   });
