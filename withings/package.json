@@ -6,7 +6,7 @@
   "dependencies": {
     "correl8-cli": "^0.1.1",
     "express": "^4.16.2",
-    "moment": "^2.19.1",
+    "moment": "^2.20.1",
     "url": "^0.11.0",
     "withings-oauth2": "0.0.9"
   },
