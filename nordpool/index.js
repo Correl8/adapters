@@ -5,11 +5,11 @@ var MS_IN_DAY = 24 * 60 * 60 * 1000;
 
 var adapter = {};
 
-adapter.sensorName = 'nordpool-price';
+adapter.sensorName = 'nordpool-price-hourly';
 
 adapter.types = [
   {
-    name: 'nordpool-price',
+    name: 'nordpool-price-hourly',
     fields: {
       timestamp: 'date',
       area: 'string',
@@ -48,35 +48,33 @@ adapter.importData = function(c8, conf, opts) {
     }).then(function(response) {
       var resp = c8.trimResults(response);
       console.log('Getting last date...');
-      if (opts.lastDate) {
+      if (opts.firstDate) {
+        firstDate = opts.firstDate;
+        if (typeof(firstDate) != 'Date') {
+          firstDate = new Date(firstDate);
+          console.log("Setting firstDate to " + firstDate.toISOString());
+        }
+      }
+      else if (opts.lastDate) {
         lastDate = opts.lastDate;
         if (typeof(lastDate) != 'Date') {
           lastDate = new Date(lastDate);
           console.log("Setting lastDate to " + lastDate.toISOString());
         }
       }
-      else if (opts.firstDate) {
-        firstDate = opts.firstDate;
-        if (typeof(firstDate) != 'Date') {
-          firstDate = new Date(firstDate);
-          console.log("Setting firstDate to " + firstDate.toISOString());
-          lastDate = new Date(firstDate.getTime() + MS_IN_DAY);
-        }
-      }
       else if (resp && resp.timestamp) {
-        lastDate = new Date(resp.timestamp);
-        lastDate.setTime(lastDate.getTime() + MS_IN_DAY);
-        console.log("Setting lastDate to " + lastDate.toISOString());
+          firstDate = new Date(resp.timestamp);
+        console.log("Setting firstDate to last found " + firstDate.toISOString());
       }
       else {
         console.warn("No previously indexed data, setting lastDate to today!");
-        console.log(response.hits.hits[0])
         lastDate = new Date();
       }
-      var params = {area: conf.area, currency: conf.currency, endDate: lastDate};
+      var params = {area: conf.area, currency: conf.currency, to: lastDate};
       if (firstDate) {
-        params.firstDate = firstDate;
+        params.from = firstDate;
       }
+      // console.log(params);
       prices.hourly(params, function(error, data) {
         if (error) {
           reject(error);
@@ -116,7 +114,8 @@ adapter.importData = function(c8, conf, opts) {
           }
         }
         else {
-          fulfill(JSON.stringify(data.Rows, null, 2));
+          fulfill('No data available');
+          // fulfill(JSON.stringify(data.Rows, null, 2));
         }
       });
     }).catch(function(error) {

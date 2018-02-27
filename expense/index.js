@@ -71,14 +71,16 @@ adapter.importData = function(c8, conf, opts) {
           var bulk = [];
           for (var i=0; i<data.length; i++) {
             var dayData = data[i];
+            var dayCost = 0;
             for (var j=0; j<dayData.length; j++) {
               var id = dayData[j].date + '-' + dayData[j].t;
               bulk.push({index: {_index: c8._index, _type: c8._type, _id: id}});
               dayData[j].id = id;
               dayData[j].timestamp = dayData[j].date;
               bulk.push(dayData[j]);
-              console.log(dayData[j].date);
+              dayCost += dayData[j].cost;
             }
+            console.log(dayData[0].date + ': ' + dayCost);
           }
           if (bulk.length > 0) {
             c8.bulk(bulk).then(function(result) {

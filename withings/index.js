@@ -35,7 +35,7 @@ adapter.types = [
     name: indexName,
     fields: {
       "timestamp": "date",
-      measures: {
+      "measures": {
         "value": "float",
         "type": "integer",
         "unit": "integer",
@@ -148,6 +148,8 @@ adapter.importData = function(c8, conf, opts) {
         }
         importData(c8, conf, firstDate, lastDate).then(function(message) {
           fulfill(message);
+        }).catch(function(error) {
+          reject(error);
         });
       });
     }).catch(function(error) {
@@ -161,6 +163,10 @@ function importData(c8, conf, firstDate, lastDate) {
     var client = new Withings(conf);
     client.getMeasuresAsync(null, firstDate, lastDate).then(function(data) {
       var bulk = [];
+      console.log(JSON.stringify(data));
+      if (!data || !data.body || !data.body.measuregrps) {
+        reject(new Error('Invalid API response: ' + JSON.stringify(data)));
+      }
       var obj = data.body.measuregrps;
       for (var i=0; i<obj.length; i++) {
         var meta = {
@@ -174,7 +180,7 @@ function importData(c8, conf, firstDate, lastDate) {
           measures: obj[i].measures
         }
         // var id = meta.date + '-' + meta.cat;
-          var id = meta.date + '-' + obj[i].grpid + '-' + meta.cat;
+        var id = meta.date + '-' + obj[i].grpid + '-' + meta.cat;
         for (var j=0; j<obj[i].measures.length; j++) {
           var t = obj[i].measures[j].type;
           var v = obj[i].measures[j].value;

@@ -6,8 +6,8 @@ var prompt = require('prompt');
 var adapter = {};
 
 var MS_IN_DAY = 24 * 60 * 60 * 1000;
-var MAX_DAYS = 1000;
-var MAX_EVENTS = 100;
+var MAX_DAYS = 366;
+var MAX_EVENTS = 1000;
 var SCOPES = ['https://www.googleapis.com/auth/calendar.readonly'];
 
 adapter.sensorName = 'googlecalendar-event';
@@ -28,7 +28,8 @@ adapter.types = [
       "created": "date",
       "updated": "date",
       "summary": "string",
-      "description": "string",
+      "analyzedSummary": "text",
+      "description": "text",
       "location": "string",
       "colorId": "string",
       "creator": {
@@ -219,13 +220,13 @@ adapter.importData = function(c8, conf, opts) {
           var firstDate, lastDate;
           if (opts.firstDate) {
             firstDate = opts.firstDate;
-            console.log('Setting first time for ' + calId + ' to ' + firstDate);
+            // console.log('Setting first time for ' + calId + ' to ' + firstDate);
           }
           else if (res.hits.hits && res.hits.hits[0] && res.hits.hits[0]._source.timestamp) {
             // console.log(res.hits.hits[0]._source);
             var d = new Date(res.hits.hits[0]._source.timestamp);
             firstDate = new Date(d.getTime() + 1);
-            console.log('Setting first time for ' + calId + '  to ' + firstDate);
+            // console.log('Setting first time for ' + calId + '  to ' + firstDate);
           }
           else {
             firstDate = new Date();
@@ -262,8 +263,8 @@ adapter.importData = function(c8, conf, opts) {
               return;
             }
             // console.log(response);
-            var cal = response.summary;
-            var events = response.items;
+            let cal = response.summary;
+            let events = response.items;
             if (!events || events.length === 0) {
               console.log(cal + ': no events found between '+ firstDate + ' and ' + lastDate + '.');
               return;
@@ -275,11 +276,13 @@ adapter.importData = function(c8, conf, opts) {
               var start = new Date(event.start.dateTime || event.start.date);
               var end = new Date(event.end.dateTime || event.end.date);
               event.calendar = cal;
+              event.analyzedSummary = event.summary; // will be treated as full text, not string
               event.calendarId = calId;
               event.timestamp = start;
               event.duration = (end.getTime() - start.getTime())/1000;
-              console.log('%s %d: %s - %s (%d s)', cal, j+1, start, event.summary, event.duration);
-              bulk.push({index: {_index: c8._index, _type: c8._type, _id: event.id}});
+              // console.log('%s %d: %s - %s (%d s)', cal, j+1, start, event.summary, event.duration);
+              // the htmlLink is the only permanent unique identifier for the event!
+              bulk.push({index: {_index: c8._index, _type: c8._type, _id: event.htmlLink}});
               bulk.push(event);
             }
             // console.log(bulk);
@@ -293,26 +296,25 @@ adapter.importData = function(c8, conf, opts) {
                     }
                   }
                   reject(new Error(messages.length + ' errors in bulk insert:\n ' + messages.join('\n ')));
-                  c8.release();
                   bulk = null;
                   return;
                 }
-                fulfill('Indexed ' + result.items.length + ' event documents in ' + result.took + ' ms.');
-                c8.release();
+                // fulfill('Indexed ' + result.items.length + ' event documents in ' + result.took + ' ms.');
+                console.log(cal + ': Indexed ' + result.items.length + ' event documents in ' + result.took + ' ms.');
                 bulk = null;
               }).catch(function(error) {
                 reject(error);
                 bulk = null;
-                c8.release();
               });
             }
             else {
-              fulfill('No data available');
-              c8.release();
+              // fulfill('No data available');
+              console.log('No data available');
             }
           });
         }
-        fulfill('Checked ' + response.responses.length + ' calendars.');
+        // fulfill('Checked ' + response.responses.length + ' calendars.');
+        console.log('Checked ' + response.responses.length + ' calendars.');
       }).catch(function(error) {
         reject(error);
         bulk = null;
