@@ -137,7 +137,7 @@ adapter.importData = function(c8, conf, opts) {
             consumptionEnergyTotal: Math.round(row[6]*100)/100,
             days: row[3]
           }
-  	  // console.log(row[0]);
+  	  // console.log(JSON.stringify(row));
           console.log(ts + ': ' + Math.round(row[6]*100)/100 + ' kWh');
           bulk.push({index: {_index: c8._index, _type: c8._type, _id: ts}});
           bulk.push(values);
