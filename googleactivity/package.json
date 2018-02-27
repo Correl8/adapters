@@ -1,0 +1,21 @@
+{
+  "name": "correl8-adapter-googleactivity",
+  "version": "1.0.0",
+  "description": "Import data from Google My Activity history (Takeout) into Correl8.me",
+  "main": "index.js",
+  "dependencies": {
+    "cheerio": "^1.0.0-rc.2",
+    "compressing": "^1.2.3",
+    "correl8-cli": "^0.1.1",
+    "googleapis": "^26.0.1",
+    "prompt": "^1.0.0",
+    "request": "^2.83.0",
+    "unzipper": "^0.8.9"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "start": "node node_modules/correl8-cli/app.js -a ../../index.js"
+  },
+  "author": "Samuel Rinnetmäki <samuel@iki.fi>",
+  "license": "ISC"
+}
