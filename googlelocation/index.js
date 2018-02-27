@@ -173,32 +173,14 @@ adapter.importData = function(c8, conf, opts) {
             console.error('stream failed for file ' + file.id + '!');
             continue;
           }
+/*
           eos(stream, function(err) {
+            console.log('End of main stream!');
             if (err) {
               return console.log('stream had an error or closed early');
             }
-            if (finishedBatches > 0) {
-              var updateParams = {
-                auth: oauth2Client,
-                fileId: file.id,
-                addParents: conf.outputDir,
-                removeParents: conf.inputDir,
-                fields: 'id, parents'
-              };
-              drive.files.update(updateParams, function(err, updated) {
-                if(err) {
-                  reject(new Error(err));
-                  return;
-                }
-                else {
-                  fulfill('Moved ' + file.name + ' from ' + conf.inputDir + ' to ' + conf.outputDir);
-                }
-              });
-            }
-            else {
-              console.log('No location history in ' + file.name);
-            }
           });
+*/
           stream
           .setMaxListeners(MAX_ZIP_ENTRIES)
           .on('error', function (error) {
@@ -220,7 +202,31 @@ adapter.importData = function(c8, conf, opts) {
               if (err) {
                 return console.log('stream had an error or closed early');
               }
-              console.log('stream has ended', this === substream);
+              // console.log('stream has ended', this === substream);
+              // The main stream (read files from Google Drive) never ends!
+              // Luckily, the zip files only contain one entry. We can consider
+              // the whole file processed when the first zip archive entry ends.
+              if (finishedBatches > 0) {
+                var updateParams = {
+                  auth: oauth2Client,
+                  fileId: file.id,
+                  addParents: conf.outputDir,
+                  removeParents: conf.inputDir,
+                  fields: 'id, parents'
+                };
+                drive.files.update(updateParams, function(err, updated) {
+                  if(err) {
+                    reject(new Error(err));
+                    return;
+                  }
+                  else {
+                    fulfill('Moved ' + file.name + ' from ' + conf.inputDir + ' to ' + conf.outputDir);
+                  }
+                });
+              }
+              else {
+                console.log('No location history in ' + file.name);
+              }
             });
             let parse = JSONStream.parse('locations.*');
             substream.pipe(parse)
@@ -262,8 +268,9 @@ adapter.importData = function(c8, conf, opts) {
             });
           })
           .on('end', function() {
+            console.log('Happy ending!');
           })
-          .on('error', reject);
+          .on('error', err => {reject(new Error(err))});
         }
         console.log('Found ' + files.length + ' file ' + (files.length == 1 ? '' : 's') + ' in ' + conf.inputDir);
       }
