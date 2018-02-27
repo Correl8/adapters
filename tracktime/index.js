@@ -209,6 +209,7 @@ adapter.importData = function(c8, conf, opts) {
             data[i].sideid = data[i].sideaction;
             data[i].sideaction = acts[data[i].sideaction];
             data[i].sidecategory = parents[data[i].sideid];
+            data[i].usecomputer = data[i].usecomputer ? true : false;
             data[i].locid = data[i].location;
             data[i].location = locs[data[i].location];
             data[i].withid = data[i]['with'];
