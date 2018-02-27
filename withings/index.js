@@ -148,6 +148,8 @@ adapter.importData = function(c8, conf, opts) {
         }
         importData(c8, conf, firstDate, lastDate).then(function(message) {
           fulfill(message);
+        }).catch(function(error) {
+          reject(error);
         });
       });
     }).catch(function(error) {
@@ -161,6 +163,10 @@ function importData(c8, conf, firstDate, lastDate) {
     var client = new Withings(conf);
     client.getMeasuresAsync(null, firstDate, lastDate).then(function(data) {
       var bulk = [];
+      console.log(JSON.stringify(data));
+      if (!data || !data.body || !data.body.measuregrps) {
+        reject(new Error('Invalid API response: ' + JSON.stringify(data)));
+      }
       var obj = data.body.measuregrps;
       for (var i=0; i<obj.length; i++) {
         var meta = {
