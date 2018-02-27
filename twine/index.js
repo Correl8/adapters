@@ -66,6 +66,7 @@ adapter.importData = function(c8, conf, opts) {
         response.meta.sensor = conf.deviceId;
         response.timestamp = new Date(response.time.timestamp * 1000);
         response.measureTime = response.time;
+        response.isVibrating = response.isVibrating ? true : false;
         delete(response.time);
         c8.insert(response).then(function(result) {
           // console.log(result);
