@@ -5,13 +5,16 @@ const eos = require('end-of-stream');
 const prompt = require('prompt');
 const fs = require('fs');
 const request = require('request');
+const cheerio = require('cheerio');
+const moment = require('moment');
+const path = require('path');
 
 
 const SCOPES = ['https://www.googleapis.com/auth/drive'];
 
 const MAX_FILES = 1;
 const MAX_ZIP_ENTRIES = 100;
-const MAX_BULK_BATCH = 10000;
+const MAX_BULK_BATCH = 5000;
 // const BULK_BATCH_MS = 2500;
 
 var adapter = {};
@@ -31,6 +34,7 @@ adapter.types = [
       actionString: 'text',
       actionUrl: 'keyword',
       locations: 'keyword',
+      coords: 'geo_point',
       details: 'keyword',
       service: 'keyword',
     }
@@ -145,7 +149,6 @@ adapter.importData = function(c8, conf, opts) {
         for (let i = 0; i < files.length; i++) {
           let file = files[i];
           let fileName = file.name;
-          let bulk = [];
           console.log('Processing file ' + i + ': ' + fileName);
 
 /*
@@ -209,6 +212,8 @@ adapter.importData = function(c8, conf, opts) {
             return;
           })
           .on('entry', function(header, substream, next) {
+            let bulk = [];
+            let data = '';
             if (header.type != 'file' || header.name == 'index.html' < 0 || header.name.indexOf('.html') < 0) {
               console.log('Skipping ' + header.type + ' ' + header.name);
               return;
@@ -220,35 +225,117 @@ adapter.importData = function(c8, conf, opts) {
               }
               // console.log('stream has ended', this === substream);
             });
-            substream.on('data', function(html) {
-              console.log(html);
-              return;
-              // console.log(JSON.stringify(data));
-              let meta = {
-                index: {
-                  _index: c8._index, _type: c8._type, _id: data.timestamp
-                }
-              };
-              bulk.push(meta);
-              bulk.push(data);
-              if (bulk.length >= (MAX_BULK_BATCH * 2)) {
-                stream.pause();
-                // console.log(JSON.stringify(bulk, null, 1));
-                // return;
-                let clone = bulk.slice(0);
-                bulk = [];
-                results.push(indexBulk(clone, conf, c8).catch(reject));
-                console.log('Started ' + results.length + ' bulk batches (' + clone[1].timestamp + ')');
-                // setTimeout(stream.resume, BULK_BATCH_MS);
-              }
+            substream.on('data', function(buff) {
+              data += buff;
+              // console.log(buff);
             })
             .on('end', function() {
-              console.log('Last batch of ' + header.name + '!');
+              console.log('Read HTML contents of ' + header.name + '!');
+              let $ = cheerio.load(data, {
+                normalizeWhitespace: true,
+                decodeEntities: true
+              });
+              $('div.content-cell').each((i, elem) => {
+                let hit = $(elem)
+                let html = hit.html();
+                let text = hit.text();
+                // console.log(text);
+                // return;
+                let found = '';
+                let prods = [];
+                if (found = text.match(/(.*)([A-Z][a-z][a-z]\s\d{2},\s\d{4},\s\d{1,2}:\d{2}:\d{2} (A|P)M)/i)) {
+                  let d = moment(found[2], 'MMM D, YYYY, H:mm:ss A');
+                  let values = {
+                    timestamp: d,
+                    dateString: found[2],
+                    actionString: found[1]
+                  };
+                  if (found = html.match(/\&nbsp;(.*)/gi)) {
+                    values.action = found;
+                  }
+                  if (caption = hit.siblings('.mdl-typography--caption')) {
+                    let details = [];
+                    let products = [];
+                    let locations = [];
+                    caption.each((j, obj) => {
+                      let item = $(obj);
+                      let captHTML = item.html();
+                      let captText = item.text();
+                      let captLinks = [];
+                      if (captLinks = item.find('a')) {
+                        captLinks.each((k, a) => {
+                          let locLink = $(a).attr('href');
+                          if (found = locLink.match(/maps\?q=([\d.]+,[\d.]+)/)) {
+                            values.coords = found[1];
+                          }
+                        });
+                      }
+                      if (found = captText.match(/Details:\s(.*)/i)) {
+                        if (found[1]) {
+                          details.push(found[1]);
+                        }
+                      }
+                      if (found = captText.match(/Products:\s(.*)/i)) {
+                        if (found[1]) {
+                          products.push(found[1]);
+                        }
+                      }
+                      if (found = captText.match(/Locations:\s(.*)/i)) {
+                        if (found[1]) {
+                          locations.push(found[1]);
+                        }
+                      }
+                      else {
+                        // console.log(captText);
+                      }
+                    });
+                    if (products.length > 0) {
+                      values.products = products;
+                    }
+                    if (locations.length > 0) {
+                      values.locations = locations;
+                    }
+                  }
+                  if (hdr = hit.siblings('.header-cell')) {
+                    hdr.each((l, header) => {
+                      values.service = $(header).text();
+                    });                    
+                  }
+                  let links = [];
+                  if (links = hit.find('a')) {
+                    links.each((n, a) => {
+                      // only keep the last
+                      values.actionUrl = $(a).attr('href');
+                    });
+                  }
+                  console.log(values.timestamp.format() + ': ' + values.actionString + ' on ' + values.service);
+                  // console.log(JSON.stringify(values, null, 1));
+                  let meta = {
+                    index: {
+                      _index: c8._index, _type: c8._type, _id: data.timestamp
+                    }
+                  };
+                  bulk.push(meta);
+                  bulk.push(values);
+                  if (bulk.length >= (MAX_BULK_BATCH * 2)) {
+                    stream.pause();
+                    // console.log(JSON.stringify(bulk, null, 1));
+                    // return;
+                    let clone = bulk.slice(0);
+                    bulk = [];
+                    results.push(indexBulk(clone, conf, c8).catch(reject));
+                    console.log('Started ' + results.length + ' bulk batches (' + clone[1].timestamp + ')');
+                  }
+                }
+                else {
+                  // console.log('No date string found in ' + html);
+                }
+              });
               if (bulk.length > 0) {
                 results.push(indexBulk(bulk, conf, c8).catch(reject));
+                console.log('Started ' + results.length + ' bulk batches (' + bulk[1].timestamp + ', last of ' + header.name + ')');
               }
-              // there is no next entry
-              // next();
+              next();
             })
             .on('error', (error) => {
               console.log('Error processing ' + header.name);
