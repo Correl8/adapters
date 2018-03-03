@@ -10,8 +10,8 @@ const request = require('request');
 
 const SCOPES = ['https://www.googleapis.com/auth/drive'];
 
-const MAX_FILES = 2;
-const MAX_ZIP_ENTRIES = 10;
+const MAX_FILES = 1;
+const MAX_ZIP_ENTRIES = 1;
 const MAX_BULK_BATCH = 10000;
 // const BULK_BATCH_MS = 2500;
 
