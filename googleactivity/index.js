@@ -1,11 +1,11 @@
 const {google} = require('googleapis');
+const { StringDecoder } = require('string_decoder');
 const compressing = require('compressing');
-// const unzip = require('unzip-stream');
 const eos = require('end-of-stream');
 const prompt = require('prompt');
 const fs = require('fs');
 const request = require('request');
-const cheerio = require('cheerio');
+const htmlparser = require('htmlparser2');
 const moment = require('moment');
 const path = require('path');
 
@@ -15,10 +15,11 @@ const SCOPES = ['https://www.googleapis.com/auth/drive'];
 const MAX_FILES = 1;
 const MAX_ZIP_ENTRIES = 100;
 const MAX_BULK_BATCH = 5000;
-// const BULK_BATCH_MS = 2500;
 
 var adapter = {};
 let finishedBatches = 0;
+let totalActions = 0;
+let fileActions = 0;
 let stream;
 
 adapter.sensorName = 'googleactivity';
@@ -31,6 +32,7 @@ adapter.types = [
       dateString: 'keyword',
       products: 'keyword',
       action: 'keyword',
+      target: 'keyword',
       actionString: 'text',
       actionUrl: 'keyword',
       locations: 'keyword',
@@ -170,14 +172,14 @@ adapter.importData = function(c8, conf, opts) {
             console.error('stream failed for file ' + file.id + '!');
             continue;
           }
-/*
-          eos(stream, function(err) {
-            console.log('End of main stream!');
+          let tgzStream = new compressing.tgz.UncompressStream();
+          eos(tgzStream, function(err) {
+            // console.log('End of gzip stream!');
             if (err) {
-              return console.log('stream had an error or closed early');
+              reject(new Error('gzip stream had an error or closed early'));
+              return;
             }
-            // The main stream (read files from Google Drive) never ends!
-            if (finishedBatches > 0) {
+            if (totalActions > 0) {
               var updateParams = {
                 auth: oauth2Client,
                 fileId: file.id,
@@ -191,150 +193,135 @@ adapter.importData = function(c8, conf, opts) {
                   return;
                 }
                 else {
-                  fulfill('Moved ' + file.name + ' from ' + conf.inputDir + ' to ' + conf.outputDir);
+                  fulfill('Indexed ' + totalActions + ' activities. Moved ' + file.name + ' from ' + conf.inputDir + ' to ' + conf.outputDir);
                 }
               });
             }
             else {
-              console.log('No location history in ' + file.name);
+              fulfill('No activity history in ' + file.name);
             }
           });
-*/
+
           stream
           .setMaxListeners(MAX_ZIP_ENTRIES)
           .on('error', function (error) {
             console.error(new Error('Stream error: ' + error));
             return;
           })
-          .pipe(new compressing.tgz.UncompressStream())
+          .pipe(tgzStream)
           .on('error', function (error) {
             console.error(new Error('UncompressStream error: ' + error));
             return;
           })
           .on('entry', function(header, substream, next) {
-            let bulk = [];
-            let data = '';
             if (header.type != 'file' || header.name == 'index.html' < 0 || header.name.indexOf('.html') < 0) {
               console.log('Skipping ' + header.type + ' ' + header.name);
               return;
             }
-            console.log(header.mtime + ': ' + header.name + ' (' + Math.round(header.size/1024) + ' kB)');
+            // console.log(header.mtime + ': ' + header.name + ' (' + Math.round(header.size/1024) + ' kB)');
+            fileActions = 0;
             eos(substream, function(err) {
               if (err) {
                 return console.log('stream had an error or closed early');
               }
               // console.log('stream has ended', this === substream);
             });
-            substream.on('data', function(buff) {
-              data += buff;
-              // console.log(buff);
-            })
-            .on('end', function() {
-              console.log('Read HTML contents of ' + header.name + '!');
-              let $ = cheerio.load(data, {
-                normalizeWhitespace: true,
-                decodeEntities: true
-              });
-              $('div.content-cell').each((i, elem) => {
-                let hit = $(elem)
-                let html = hit.html();
-                let text = hit.text();
-                // console.log(text);
-                // return;
-                let found = '';
-                let prods = [];
-                if (found = text.match(/(.*)([A-Z][a-z][a-z]\s\d{2},\s\d{4},\s\d{1,2}:\d{2}:\d{2} (A|P)M)/i)) {
-                  let d = moment(found[2], 'MMM D, YYYY, H:mm:ss A');
-                  let values = {
-                    timestamp: d,
-                    dateString: found[2],
-                    actionString: found[1]
-                  };
-                  if (found = html.match(/\&nbsp;(.*)/gi)) {
-                    values.action = found;
-                  }
-                  if (caption = hit.siblings('.mdl-typography--caption')) {
-                    let details = [];
-                    let products = [];
-                    let locations = [];
-                    caption.each((j, obj) => {
-                      let item = $(obj);
-                      let captHTML = item.html();
-                      let captText = item.text();
-                      let captLinks = [];
-                      if (captLinks = item.find('a')) {
-                        captLinks.each((k, a) => {
-                          let locLink = $(a).attr('href');
-                          if (found = locLink.match(/maps\?q=([\d.]+,[\d.]+)/)) {
-                            values.coords = found[1];
-                          }
-                        });
-                      }
-                      if (found = captText.match(/Details:\s(.*)/i)) {
-                        if (found[1]) {
-                          details.push(found[1]);
-                        }
-                      }
-                      if (found = captText.match(/Products:\s(.*)/i)) {
-                        if (found[1]) {
-                          products.push(found[1]);
-                        }
-                      }
-                      if (found = captText.match(/Locations:\s(.*)/i)) {
-                        if (found[1]) {
-                          locations.push(found[1]);
-                        }
-                      }
-                      else {
-                        // console.log(captText);
-                      }
-                    });
-                    if (products.length > 0) {
-                      values.products = products;
-                    }
-                    if (locations.length > 0) {
-                      values.locations = locations;
-                    }
-                  }
-                  if (hdr = hit.siblings('.header-cell')) {
-                    hdr.each((l, header) => {
-                      values.service = $(header).text();
-                    });                    
-                  }
-                  let links = [];
-                  if (links = hit.find('a')) {
-                    links.each((n, a) => {
-                      // only keep the last
-                      values.actionUrl = $(a).attr('href');
-                    });
-                  }
-                  console.log(values.timestamp.format() + ': ' + values.actionString + ' on ' + values.service);
-                  // console.log(JSON.stringify(values, null, 1));
+            let openedClass = '';
+            let bulk = [];
+            let action = new ActionObject();
+            let currentArray = action.actions;
+            let parser = new htmlparser.Parser({
+              onopentag: (tag, attrs) => {
+                let myClass = handleOpenTag(tag, attrs);
+                if (tag == 'a' && attrs.href) {
+                  action.links.push(attrs.href);
+                }
+                else if ((myClass == 'caption') || (myClass == 'content')) {
+                  openedClass = myClass;
+                }
+                if ((myClass == 'content') && action.timestamp) {
+                  let i;
+                  let values = action.toValues();
                   let meta = {
                     index: {
-                      _index: c8._index, _type: c8._type, _id: data.timestamp
+                      _index: c8._index, _type: c8._type, _id: values.timestamp + '-' + values.service
                     }
                   };
                   bulk.push(meta);
                   bulk.push(values);
+                  fileActions++;
+                  totalActions++;
                   if (bulk.length >= (MAX_BULK_BATCH * 2)) {
                     stream.pause();
-                    // console.log(JSON.stringify(bulk, null, 1));
-                    // return;
                     let clone = bulk.slice(0);
                     bulk = [];
-                    results.push(indexBulk(clone, conf, c8).catch(reject));
-                    console.log('Started ' + results.length + ' bulk batches (' + clone[1].timestamp + ')');
+                    results.push(indexBulk(clone, conf, c8).catch((error) => {reject(new Error(error));}));
+                    // console.log('Started ' + results.length + ' bulk batches (' + clone[1].timestamp + ')');
+                  }
+                  action = new ActionObject();
+                  currentArray = action.actions;
+                }
+              },
+              ontext: (text) => {
+                if (openedClass == 'caption') {
+                  action.captions.push(text);
+                }
+                else if (openedClass == 'content') {
+                  let i;
+                  if (text.indexOf('Details:') >= 0) {
+                    currentArray = action.details;
+                  }
+                  else if (text.indexOf('Locations:') >= 0) {
+                    currentArray = action.locations;
+                  }
+                  else if (text.indexOf('Products:') >= 0) {
+                    currentArray = action.products;
+                  }
+                  else if (i = text.match(/maps\?q=([\d.]+,[\d.]+)/)) {
+                    action.coords = i[1];
+                  }
+                  else if ((i = moment(text, 'MMM D, YYYY, H:mm:ss A')) && i.isValid()) {
+                    action.timestamp = i.format();
+                    action.dateString = text;
+                  }
+                  else {
+                    currentArray.push(text);
                   }
                 }
-                else {
-                  // console.log('No date string found in ' + html);
+              },
+              onclosetag: (tag) => {
+                if (tag == 'br') {
+                  currentArray.push(' ');
                 }
-              });
-              if (bulk.length > 0) {
-                results.push(indexBulk(bulk, conf, c8).catch(reject));
-                console.log('Started ' + results.length + ' bulk batches (' + bulk[1].timestamp + ', last of ' + header.name + ')');
               }
+            },
+            {
+              normalizeWhitespace: true,
+              decodeEntities: true
+            });
+            let decoder = new StringDecoder('utf8');
+            substream.on('data', function(buff) {
+              parser.parseChunk(decoder.write(buff));
+            })
+            .on('end', function() {
+              if (action.timestamp) {
+                let values = action.toValues();
+                let meta = {
+                  index: {
+                    _index: c8._index, _type: c8._type, _id: values.timestamp + '-' + values.service
+                  }
+                };
+                bulk.push(meta);
+                bulk.push(values);
+                fileActions++;
+                totalActions++;
+              }
+              parser.end();
+              if (bulk.length > 0) {
+                results.push(indexBulk(bulk, conf, c8).catch((error) => {reject(new Error(error));}));
+                // console.log('Started ' + results.length + ' bulk batches (' + bulk[1].timestamp + ', last of ' + header.name + ')');
+              }
+              console.log(header.name + ': ' + fileActions + ' activities.');
               next();
             })
             .on('error', (error) => {
@@ -354,6 +341,25 @@ adapter.importData = function(c8, conf, opts) {
   });
 };
 
+function handleOpenTag(name, attrs) {
+  let openedType = '';
+  if (attrs && attrs.class &&
+      (attrs.class.indexOf('content-cell') >= 0) &&
+      (attrs.class.indexOf('mdl-typography--body-1') >= 0) &&
+      (attrs.class.indexOf('mdl-typography--text-right') < 0)) {
+    return 'content';
+  }
+  else if (attrs && attrs.class && attrs.class.indexOf('header-cell') >= 0) {
+    return 'caption';
+  }
+  else if (attrs && attrs.class) {
+    // console.log(attrs.class);
+  }
+  else {
+    return false;
+  }
+}
+
 function indexBulk(bulkData, oonf, c8) {
   return new Promise(function (fulfill, reject){
     c8.bulk(bulkData).then(function(result) {
@@ -371,12 +377,63 @@ function indexBulk(bulkData, oonf, c8) {
           reject(new Error(JSON.stringify(result.errors)));
         }
       }
-      console.log('Finished ' + (++finishedBatches) + ' bulk batches.');
+      // console.log('Finished ' + (++finishedBatches) + ' bulk batches.');
       stream.resume();
       // process.stdout.write('>');
       fulfill(result);
-    }).catch(reject);
+    }).catch((error) => {reject(new Error(error));});
   });
 }
+
+function ActionObject () {
+  this.timestamp = null;
+  this.actions = [];
+  this.captions = [];
+  this.coords = '';
+  this.dateString = '';
+  this.details = [];
+  this.links = [];
+  this.locations = [];
+  this.products = [];
+
+  this.toValues = function() {
+    let values = {
+      timestamp: this.timestamp,
+      dateString: this.dateString,
+      service: this.captions.join('').trim()
+    };
+    if (this.products.length) {
+      values.products = this.products.join(' ').trim();
+    }
+    if (this.locations.length) {
+      values.locations = this.locations.join(' ').trim();
+    }
+    if (this.details.length) {
+      values.details = this.details.join(' ').trim();
+    }
+    if (this.coords) {
+      values.coords = this.coords;
+    }
+    values.actionString = this.actions.join('').trim();
+    if (values.actionString && values.actionString.indexOf(String.fromCharCode(0x00A0)) >= 0) {
+      [values.action, values.target] = values.actionString.split(String.fromCharCode(0x00A0));
+    }
+    else if (values.actionString && ((i = values.actionString.indexOf(' - ')) > 0)) {
+      values.action = values.actionString.substring(0, i).trim();
+      values.target = values.actionString.substring(i).trim();
+    }
+    else if (values.actionString && ((i = values.actionString.indexOf(' ')) > 0)) {
+      values.action = values.actionString.substring(0, i).trim();
+      values.target = values.actionString.substring(i).trim();
+    }
+    else {
+      values.action = values.actionString;
+    }
+    if (this.links.length) {
+      values.actionUrl = (this.links.length > 1) ? this.links : this.links[0];
+    }
+    return values;
+  }
+};
 
 module.exports = adapter;
