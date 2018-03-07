@@ -280,8 +280,8 @@ adapter.importData = function(c8, conf, opts) {
                   else if (i = text.match(/maps\?q=([\d.]+,[\d.]+)/)) {
                     action.coords = i[1];
                   }
-                  else if ((i = moment(text, 'MMM D, YYYY, H:mm:ss A')) && i.isValid()) {
-                    action.timestamp = i.format();
+                  else if ((i = moment(text, 'MMM D, YYYY, H:mm:ss A').isValid())) {
+                    action.timestamp = moment(text, 'MMM D, YYYY, H:mm:ss A');
                     action.dateString = text;
                   }
                   else {
@@ -371,7 +371,7 @@ function indexBulk(bulkData, oonf, c8) {
               errors.push(x + ': ' + result.items[x].index.error.reason);
             }
           }
-          reject(new Error(fileName + ': ' + errors.length + ' errors in bulk insert:\n ' + errors.join('\n ')));
+          reject(new Error(errors.length + ' errors in bulk insert:\n ' + errors.join('\n ')));
         }
         else {
           reject(new Error(JSON.stringify(result.errors)));
@@ -383,6 +383,10 @@ function indexBulk(bulkData, oonf, c8) {
       fulfill(result);
     }).catch((error) => {reject(new Error(error));});
   });
+}
+
+function onlyUnique(value, index, self) {
+  return self.indexOf(value) === index;
 }
 
 function ActionObject () {
@@ -400,16 +404,16 @@ function ActionObject () {
     let values = {
       timestamp: this.timestamp,
       dateString: this.dateString,
-      service: this.captions.join('').trim()
+      service: this.captions.filter(onlyUnique).join('').trim()
     };
     if (this.products.length) {
-      values.products = this.products.join(' ').trim();
+      values.products = this.products.filter(onlyUnique).join(' ').trim();
     }
     if (this.locations.length) {
-      values.locations = this.locations.join(' ').trim();
+      values.locations = this.locations.filter(onlyUnique).join(' ').trim();
     }
     if (this.details.length) {
-      values.details = this.details.join(' ').trim();
+      values.details = this.details.filter(onlyUnique).join(' ').trim();
     }
     if (this.coords) {
       values.coords = this.coords;
@@ -417,6 +421,10 @@ function ActionObject () {
     values.actionString = this.actions.join('').trim();
     if (values.actionString && values.actionString.indexOf(String.fromCharCode(0x00A0)) >= 0) {
       [values.action, values.target] = values.actionString.split(String.fromCharCode(0x00A0));
+    }
+    else if (values.actionString && ((i = values.actionString.indexOf(': ')) > 0)) {
+      values.action = values.actionString.substring(0, i).trim();
+      values.target = values.actionString.substring(i).trim();
     }
     else if (values.actionString && ((i = values.actionString.indexOf(' - ')) > 0)) {
       values.action = values.actionString.substring(0, i).trim();
