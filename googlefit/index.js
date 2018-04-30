@@ -48,7 +48,7 @@ adapter.types = [
       'latitude': 'float',
       'longitude': 'float',
       'originDataSourceId': 'string',
-      'position': 'geo_point',
+      'coords': 'geo_point',
       'rpm': 'float',
       'resistance': 'float',
       'speed': 'float',
@@ -66,7 +66,7 @@ adapter.types = [
     fields: {
       duration: 'integer',
       timestamp: 'date',
-      position: 'geo_point'
+      coords: 'geo_point'
     }
   }
 ];
@@ -265,7 +265,7 @@ adapter.importData = function(c8, conf, opts) {
                   }
                 }
                 if (ll.length == 2) {
-                  values.position = ll.join(',');
+                  values.coords = ll.join(',');
                 }
                 values.dataSourceId = resp.dataSourceId;
                 if (item.originDataSourceId) {
