@@ -31,7 +31,7 @@ adapter.types = [
       timestamp: 'date',
       dateString: 'keyword',
       products: 'keyword',
-      action: 'keyword',
+      actionType: 'keyword',
       target: 'keyword',
       actionString: 'text',
       actionUrl: 'keyword',
@@ -404,7 +404,7 @@ function ActionObject () {
     let values = {
       timestamp: this.timestamp,
       dateString: this.dateString,
-      service: this.captions.filter(onlyUnique).join('').trim()
+      service: this.captions.filter(onlyUnique).join(' ').trim()
     };
     if (this.products.length) {
       values.products = this.products.filter(onlyUnique).join(' ').trim();
@@ -420,22 +420,22 @@ function ActionObject () {
     }
     values.actionString = this.actions.join('').trim();
     if (values.actionString && values.actionString.indexOf(String.fromCharCode(0x00A0)) >= 0) {
-      [values.action, values.target] = values.actionString.split(String.fromCharCode(0x00A0));
+      [values.actionType, values.target] = values.actionString.split(String.fromCharCode(0x00A0));
     }
     else if (values.actionString && ((i = values.actionString.indexOf(': ')) > 0)) {
-      values.action = values.actionString.substring(0, i).trim();
+      values.actionType = values.actionString.substring(0, i).trim();
       values.target = values.actionString.substring(i).trim();
     }
     else if (values.actionString && ((i = values.actionString.indexOf(' - ')) > 0)) {
-      values.action = values.actionString.substring(0, i).trim();
+      values.actionType = values.actionString.substring(0, i).trim();
       values.target = values.actionString.substring(i).trim();
     }
     else if (values.actionString && ((i = values.actionString.indexOf(' ')) > 0)) {
-      values.action = values.actionString.substring(0, i).trim();
+      values.actionType = values.actionString.substring(0, i).trim();
       values.target = values.actionString.substring(i).trim();
     }
     else {
-      values.action = values.actionString;
+      values.actionType = values.actionString;
     }
     if (this.links.length) {
       values.actionUrl = (this.links.length > 1) ? this.links : this.links[0];
