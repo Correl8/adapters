@@ -29,7 +29,7 @@ adapter.types = [
       timestampMs: 'keyword',
       latitudeE7: 'long',
       longitudeE7: 'long',
-      location: 'geo_point',
+      coords: 'geo_point',
       accuracy: 'integer',
       altitude: 'integer',
       activity: {
@@ -233,7 +233,7 @@ adapter.importData = function(c8, conf, opts) {
             .on('data', function(data) {
               // console.log(JSON.stringify(data));
               data.timestamp = new Date(Number(data.timestampMs));
-              data.location = data.latitudeE7/10E6 + ',' + data.longitudeE7/10E6;
+              data.coords = data.latitudeE7/10E6 + ',' + data.longitudeE7/10E6;
               // console.log(JSON.stringify(data));
               let meta = {
                 index: {
