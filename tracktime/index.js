@@ -127,8 +127,8 @@ adapter.types = [
       withid: 'integer',
       with: 'keyword',
       usecomputer: 'boolean',
-      location: 'keyword',
-      locid: 'integer',
+      where: 'keyword',
+      whereid: 'integer',
       description: 'text',
       rating: 'integer'
     }
@@ -210,8 +210,9 @@ adapter.importData = function(c8, conf, opts) {
             data[i].sideaction = acts[data[i].sideaction];
             data[i].sidecategory = parents[data[i].sideid];
             data[i].usecomputer = data[i].usecomputer ? true : false;
-            data[i].locid = data[i].location;
-            data[i].location = locs[data[i].location];
+            data[i].whereid = data[i].location;
+            data[i].where = locs[data[i].location];
+            delete(data[i].location);
             data[i].withid = data[i]['with'];
             if (data[i] == 1) {
               data[i].withid = ['alone'];
@@ -249,7 +250,7 @@ adapter.importData = function(c8, conf, opts) {
               bulk.push(copy);
               // console.log(JSON.stringify(copy.sliceId) + ': ' + sliceTime);
             }
-            console.log(data[i].timestamp);
+            // console.log(data[i].timestamp);
           }
           if (bulk.length > 0) {
             c8.bulk(bulk).then(function(result) {
