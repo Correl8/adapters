@@ -4,11 +4,13 @@ const google = require('googleapis');
 const drive = google.drive('v3');
 const googleAuth = require('google-auth-library');
 const unzip = require('unzipper');
+const eos = require('end-of-stream');
 const prompt = require('prompt');
 
 const SCOPES = ['https://www.googleapis.com/auth/drive'];
 
-const MAX_FILES = 100;
+const MAX_FILES = 2;
+const MAX_ZIP_ENTRIES = 100;
 const MAX_BULK_BATCH = 10000;
 
 var adapter = {};
@@ -171,7 +173,7 @@ adapter.importData = function(c8, conf, opts) {
           }
         });
         fulfill(resultMessage + ', ' + totalEntries + ' files, ' + totalQueries + ' search queries in ' + totalTook + ' ms. (' + totalIndexed + ' entries due to repeated queries.)');
-      });
+      }).catch(reject);
     });
   });
 };
@@ -183,12 +185,13 @@ function processTakeoutFile(oauth2Client, file, c8, conf) {
     let bulk = [];
     let zipEntries = 0;
     let fileQueries = 0;
-    drive.files.get({
+    var stream = drive.files.get({
       auth: oauth2Client,
       fileId: file.id,
       alt: 'media'
-    })
-    .setMaxListeners(MAX_FILES)
+    });
+    
+    stream.setMaxListeners(MAX_ZIP_ENTRIES)
     .on('end', () => {
       if (bulk.length > 0) {
         c8.bulk(bulk).then(result => {
@@ -223,6 +226,10 @@ function processTakeoutFile(oauth2Client, file, c8, conf) {
       }
       // console.log('Processing ' + zipEntry);
       entry.buffer().then(json => {
+        if (json.toString().substr(0, 1) != '{') {
+          console.warn('Not JSON (' + json.substr(0, 1) + '): ' + json);
+          process.exit();
+        }
         let queries = JSON.parse(json);
         // console.log('All queries are ' + JSON.stringify(queries, null, 1));
         queries.event.forEach(event => {
@@ -250,8 +257,33 @@ function processTakeoutFile(oauth2Client, file, c8, conf) {
         console.log(fileName + '/' + zipEntry + ': ' + queries.event.length + ' queries');
         zipEntries++;
         fileQueries += queries.event.length;
+        // temporarily do this here (since zip never ends)
+        if (bulk.length > 0) {
+          c8.bulk(bulk).then(result => {
+            finishedBatches++;
+            if (result.errors) {
+              if (result.items) {
+                let errors = [];
+                for (let x=0; x<result.items.length; x++) {
+                  if (result.items[x].index.error) {
+                    errors.push(x + ': ' + result.items[x].index.error.reason);
+                  }
+                }
+                reject(new Error(fileName + ': ' + errors.length + ' errors in bulk insert:\n ' + errors.join('\n ')));
+              }
+              else {
+                reject(new Error(JSON.stringify(result.errors))); 
+              }
+            }
+            // console.log({file: file, zipEntries: zipEntries, fileQueries: fileQueries, indexed: result.items.length, took: result.took});
+          }).catch(reject);
+        }
+        else {
+          // console.log({file: file, zipEntries: zipEntries, fileQueries: fileQueries, indexed: 0, took: 0});
+        }
       })
       .catch(reject);
+      // end temp
     })
     .on('end', () => {
       console.log('\n\nEnd never reached!\n\n');
@@ -259,6 +291,35 @@ function processTakeoutFile(oauth2Client, file, c8, conf) {
     .on('error', reject)
     .promise().then(res => {
       console.log('\n\nNever promised!\n\n');
+    });
+    eos(stream, function(err) {
+      if (bulk.length > 0) {
+        c8.bulk(bulk).then(result => {
+          finishedBatches++;
+          if (result.errors) {
+            if (result.items) {
+              let errors = [];
+              for (let x=0; x<result.items.length; x++) {
+                if (result.items[x].index.error) {
+                  errors.push(x + ': ' + result.items[x].index.error.reason);
+                }
+              }
+              reject(new Error(fileName + ': ' + errors.length + ' errors in bulk insert:\n ' + errors.join('\n ')));
+            }
+            else {
+              reject(new Error(JSON.stringify(result.errors))); 
+            }
+          }
+          console.log({file: file, zipEntries: zipEntries, fileQueries: fileQueries, indexed: result.items.length, took: result.took});
+        }).catch(reject);
+      }
+      else {
+        console.log({file: file, zipEntries: zipEntries, fileQueries: fileQueries, indexed: 0, took: 0});
+      }
+      if (err) {
+        reject(err);
+      }
+      console.log('Stream finished successfully');
     });
   });
 }
