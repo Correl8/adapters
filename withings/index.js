@@ -163,7 +163,7 @@ function importData(c8, conf, firstDate, lastDate) {
     var client = new Withings(conf);
     client.getMeasuresAsync(null, firstDate, lastDate).then(function(data) {
       var bulk = [];
-      console.log(JSON.stringify(data));
+      // console.log(JSON.stringify(data));
       if (!data || !data.body || !data.body.measuregrps) {
         reject(new Error('Invalid API response: ' + JSON.stringify(data)));
       }
