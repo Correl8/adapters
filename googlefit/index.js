@@ -60,14 +60,6 @@ adapter.types = [
       'watts': 'float',
       'weight': 'float'
     }
-  },
-  {
-    name: 'googlefit-session',
-    fields: {
-      duration: 'integer',
-      timestamp: 'date',
-      coords: 'geo_point'
-    }
   }
 ];
 
