@@ -316,7 +316,8 @@ function storeData(auth) {
             bulk.push(values);
           }
           //  console.log(JSON.stringify(bulk, null, 2));
-          c8.bulk(bulk).then(function(result) {
+          c8.bulk(bulk).then(function(response) {
+            let result = c8.trimBulkResults(response);
             // console.log('Indexed ' + result.items.length + ' items in ' + result.took + ' ms.');
             bulk = null;
           }).catch(function(error) {

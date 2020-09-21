@@ -11,16 +11,32 @@ adapter.types = [
     name: 'example-sensor',
     // field names and types will be learned if not specified here
     fields: {
-      timestamp: 'date',
-      value: 'integer',
-      name: 'string',
-      type: 'string'
+      "@timestamp": 'date',
+      "ecs": {
+        "version": 'keyword'
+      },
+      "event": {
+        "created": "date",
+        "module": "keyword",
+        "original": "keyword",
+        "start": "date",
+      },
+      "sensor": {
+        "foo": {
+          "id": 'keyword',
+          "name": 'date'
+        },
+        "bar": {
+          "id": 'keyword',
+          "name": 'keyword'
+        },
+        "baz": 'float'
+      }
     }
   }
 ];
 
 // configurable settings, see https://www.npmjs.com/package/prompt
-// and
 adapter.promptProps = {
   properties: {
     url: {
@@ -81,7 +97,8 @@ adapter.importData = function(c8, conf, opts) {
               console.log(dayData[j].date);
             }
           }
-          return c8.bulk(bulk).then(function(result) {
+          return c8.bulk(bulk).then(function(response) {
+            let result = c8.trimBulkResults(response);
             c8.release();
             if (result.errors) {
               var messages = [];

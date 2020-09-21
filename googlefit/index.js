@@ -56,7 +56,6 @@ adapter.types = [
       'startTimeNanos': 'long',
       'steps': 'float',
       'timestamp': 'date',
-      'timestamp': 'date',
       'watts': 'float',
       'weight': 'float'
     }
@@ -207,6 +206,7 @@ adapter.importData = function(c8, conf, opts) {
               reject(new Error('The fitness API returned an error when reading data set: ' + err));
               return;
             }
+            // console.log(resp);
             if (resp.point && resp.point.length > 0) {
               var dsId = resp.dataSourceId;
               var dType = dTypes[dsId];
@@ -218,6 +218,8 @@ adapter.importData = function(c8, conf, opts) {
               // console.log(resp.dataSourceId);
               var points = resp.point;
               // console.log(points);
+              var shortName = dsName.replace(/^(.*?)\:.*\:(.*?)$/,'$1...$2');
+              console.log(points.length + ' points of ' + shortName);
               var bulk = [];
               for (var j=0; j<points.length; j++) {
                 var item = points[j];
@@ -272,7 +274,8 @@ adapter.importData = function(c8, conf, opts) {
               }
               // console.log(JSON.stringify(bulk, null, 2));
               if (bulk.length > 0) {
-                c8.bulk(bulk).then(function(result) {
+                c8.bulk(bulk).then(function(response) {
+                  let result = c8.trimBulkResults(response);
                   if (result.errors) {
                     var messages = [];
                     for (var i=0; i<result.items.length; i++) {
@@ -282,7 +285,7 @@ adapter.importData = function(c8, conf, opts) {
                     }
                     console.error(messages.length + ' errors in bulk insert:\n ' + messages.join('\n '));
                   }
-                  console.log('Indexed ' + result.items.length + ' documents in ' + result.took + ' ms.');
+                  // console.log('Indexed ' + result.items.length + ' documents in ' + result.took + ' ms.');
                 }).catch(function(error) {
                   console.error(error);
                 });

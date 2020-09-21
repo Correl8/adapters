@@ -1,7 +1,7 @@
 const JSONStream = require('JSONStream');
 const {google} = require('googleapis');
 const compressing = require('compressing');
-// const unzip = require('unzip-stream');
+const unzip = require('unzip-stream');
 const eos = require('end-of-stream');
 const prompt = require('prompt');
 const fs = require('fs');
@@ -10,7 +10,7 @@ const request = require('request');
 
 const SCOPES = ['https://www.googleapis.com/auth/drive'];
 
-const MAX_FILES = 1;
+const MAX_FILES = 5;
 const MAX_ZIP_ENTRIES = 1;
 const MAX_BULK_BATCH = 10000;
 // const BULK_BATCH_MS = 2500;
@@ -132,7 +132,7 @@ adapter.importData = function(c8, conf, opts) {
     // console.log(JSON.stringify(conf.credentials));
     drive.files.list({
       auth: oauth2Client,
-      spaces: drive,
+      spaces: "drive",
       q: "trashed != true and '" + conf.inputDir + "' in parents and mimeType='application/x-gtar'",
       pageSize: MAX_FILES,
       fields: "files(id, name)"
@@ -280,7 +280,8 @@ adapter.importData = function(c8, conf, opts) {
 
 function indexBulk(bulkData, oonf, c8) {
   return new Promise(function (fulfill, reject){
-    c8.bulk(bulkData).then(function(result) {
+    c8.bulk(bulkData).then(function(response) {
+      let result = c8.trimBulkResults(response);
       if (result.errors) {
         if (result.items) {
           let errors = [];

@@ -136,7 +136,8 @@ adapter.importData = function(c8, conf, opts) {
           bulk.push(values);
         }
         // console.log(bulk);
-        c8.bulk(bulk).then(function(result) {
+        c8.bulk(bulk).then(function(response) {
+          let result = c8.trimBulkResults(response);
           fulfill('Indexed ' + result.items.length + ' rows in ' + result.took + ' ms.');
           bulk = null;
         }).catch(function(error) {

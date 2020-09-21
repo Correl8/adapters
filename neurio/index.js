@@ -188,7 +188,8 @@ function getAppliancePage(c8, client, locId, firstDate, lastDate, minPower, perP
       bulk.push(values);
     }
     if (bulk.length > 0) {
-      c8.type(applianceType).bulk(bulk).then(function(result) {
+      c8.type(applianceType).bulk(bulk).then(function(response) {
+        let result = c8.trimBulkResults(response);
         if (result.errors) {
           var messages = [];
           for (var i=0; i<result.items.length; i++) {
@@ -252,7 +253,8 @@ function getSamplesHistoryPage(c8, client, sensorId, start, end, granularity, fr
       // console.log(values);
     }
     if (bulk.length > 0) {
-      c8.type(sampleType).bulk(bulk).then(function(result) {
+      c8.type(sampleType).bulk(bulk).then(function(response) {
+        let result = c8.trimBulkResults(response);
         if (result.errors) {
           var messages = [];
           for (var i=0; i<result.items.length; i++) {
@@ -305,7 +307,8 @@ function getEnergyStats(c8, client, sensorId, start, end, granularity, frequency
       bulk.push(values);
     }
     if (bulk.length > 0) {
-      c8.type(energyType).bulk(bulk).then(function(result) {
+      c8.type(energyType).bulk(bulk).then(function(response) {
+        let result = c8.trimBulkResults(response);
         if (result.errors) {
           var messages = [];
           for (var i=0; i<result.items.length; i++) {

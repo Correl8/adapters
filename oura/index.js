@@ -34,6 +34,7 @@ var activitySummaryIndex = 'oura-activity-summary';
 var readinessSummaryIndex = 'oura-readiness-summary';
 var sleepStateIndex = 'oura-sleep-state';
 var sleepHRIndex = 'oura-sleep-hr';
+var sleepHRVIndex = 'oura-sleep-rmssd';
 var activityClassIndex = 'oura-activity-class';
 var activityMETIndex = 'oura-activity-met';
 
@@ -45,32 +46,35 @@ adapter.types = [
       "summary_date": "date",
       "period_id": "integer",
       "is_longest": "boolean",
+      "timezone": "integer",
       "bedtime_start": "date",
       "bedtime_end": "date",
-      "timezone": "integer",
-      "duration": "integer",
       "score": "integer",
-      "total": "integer",
-      "awake": "integer",
-      "rem": "integer",
-      "light": "integer",
-      "deep": "integer",
-      "efficiency": "integer",
-      "hr_low_duration": "integer",
-      "hr_lowest": "integer",
-      "wake_up_count": "integer",
-      "onset_latency": "integer",
-      "hr_average": "float",
-      "midpoint_time": "integer",
-      "restless": "integer",
-      "got_up_count": "integer",
       "score_total": "integer",
-      "score_deep": "integer",
-      "score_rem": "integer",
+      "score_disturbances": "integer",
       "score_efficiency": "integer",
       "score_latency": "integer",
-      "score_disturbances": "integer",
-      "score_alignment": "integer"
+      "score_rem": "integer",
+      "score_deep": "integer",
+      "score_alignment": "integer",
+      "total": "integer",
+      "duration": "integer",
+      "awake": "integer",
+      "light": "integer",
+      "rem": "integer",
+      "deep": "integer",
+      "onset_latency": "integer",
+      "restless": "integer",
+      "efficiency": "integer",
+      "midpoint_time": "integer",
+      "hr_lowest": "integer",
+      "hr_average": "float",
+      "rmssd": "integer",
+      "breath_average": "float",
+      "temperature_delta": "float",
+      "hr_low_duration": "integer", // not mentioned in the api docs anymore?
+      "wake_up_count": "integer", // not mentioned in the api docs anymore?
+      "got_up_count": "integer" // not mentioned in the api docs anymore?
     }
   },
   {
@@ -138,6 +142,14 @@ adapter.types = [
       "timestamp": "date",
       "duration": "integer",
       "hr": "integer"
+    }
+  },
+  {
+    name: sleepHRVIndex,
+    fields: {
+      "timestamp": "date",
+      "duration": "integer",
+      "rmssd": "integer"
     }
   },
   {
@@ -304,26 +316,42 @@ function getSleep(c8, client, start, end) {
       var bulk = [];
       var obj = response.sleep;
       for (var i=0; i<obj.length; i++) {
+        obj[i].timestamp = moment(obj[i].bedtime_end);
+        obj[i].is_longest = obj[i].is_longest ? true : false;
         // var summaryDate = obj[i].summary_date;
-        var summaryDate = moment(obj[i].bedtime_end).format('YYYY-MM-DD');
-        console.log(summaryDate);
+        // var summaryDate = obj[i].timestamp.format('YYYY-MM-DD');
         var sleepStateData = obj[i].hypnogram_5min ? obj[i].hypnogram_5min.split("") : [];
-        var sleepHRData = obj[i].hr_10min;
-        obj[i].timestamp = summaryDate;
-        var id = summaryDate + obj[i].period_id;
+        var sleepHRData = obj[i].hr_5min;
+        var sleepHRVData = obj[i].rmssd_5min;
+        var id = obj[i].summary_date + '.' + obj[i].period_id;
+        console.log(id + ': sleep score ' + obj[i].score + '; ' + Math.round(obj[i].duration/360)/10 + ' hours of sleep');
         bulk.push({index: {_index: c8.type(sleepSummaryIndex)._index, _type: c8._type, _id: id}});
         bulk.push(obj[i]);
+        // console.log(JSON.stringify(obj[i], null, 1));
         if (sleepHRData && sleepHRData.length) {
           var d = moment(obj[i].bedtime_start);
-          var duration = 10 * 60; // seconds
+          var duration = 5 * 60; // seconds
           for (var j=0; j<sleepHRData.length; j++) {
-            d.add(10, 'minutes');
-            if (sleepHRData[j] == 255) {
+            d.add(5, 'minutes');
+            if ((sleepHRData[j] == 0) || (sleepHRData[j] == 255)) {
               // ignore value, it's likely faulty
               continue;
             }
             bulk.push({index: {_index: c8.type(sleepHRIndex)._index, _type: c8._type, _id: d.format()}});
-              bulk.push({timestamp: d.format(), duration: duration, hr: sleepHRData[j]});
+            bulk.push({timestamp: d.format(), duration: duration, hr: sleepHRData[j]});
+          }
+        }
+        if (sleepHRVData && sleepHRVData.length) {
+          var d = moment(obj[i].bedtime_start);
+          var duration = 5 * 60; // seconds
+          for (var j=0; j<sleepHRVData.length; j++) {
+            d.add(5, 'minutes');
+            if ((sleepHRVData[j] == 0) || (sleepHRVData[j] == 255)) {
+              // ignore value, it's likely faulty
+              continue;
+            }
+            bulk.push({index: {_index: c8.type(sleepHRVIndex)._index, _type: c8._type, _id: d.format()}});
+            bulk.push({timestamp: d.format(), duration: duration, hr: sleepHRVData[j]});
           }
         }
         if (sleepStateData && sleepStateData.length) {
@@ -337,10 +365,22 @@ function getSleep(c8, client, start, end) {
         }
       }
       if (bulk.length > 0) {
-        c8.bulk(bulk).then(function(result) {
+        // console.log(JSON.stringify(bulk, null, 1));
+        c8.bulk(bulk).then(function(response) {
+          let result = c8.trimBulkResults(response);
+          if (result.errors) {
+            var messages = [];
+            for (var i=0; i<result.items.length; i++) {
+              if (result.items[i].index.error) {
+                messages.push(i + ': ' + result.items[i].index.error.reason);
+              }
+            }
+            reject(new Error(messages.length + ' errors in bulk insert:\n ' + messages.join('\n ')));
+          }
           fulfill('Indexed ' + result.items.length + ' sleep documents in ' + result.took + ' ms.');
         }).catch(function(error) {
           reject(error);
+          bulk = null;
         });
       }
       else {
@@ -355,18 +395,20 @@ function getSleep(c8, client, start, end) {
 function getActivity(c8, client, start, end) {
   return new Promise(function (fulfill, reject){
     client.activity(start, end).then(function (response) {
+      // console.log(JSON.stringify(response, null, 1));
       var bulk = [];
       var obj = response.activity;
       for (var i=0; i<obj.length; i++) {
-        var summaryDate = obj[i].summary_date;
-        console.log(summaryDate);
+        obj[i].timestamp = obj[i].summary_date;
+        // console.log(obj[i].summary_date);
         var activityClassData = obj[i].class_5min.split("");
         var activityMETData = obj[i].met_1min;
-        var id = obj[i].timestamp = summaryDate;
+        var id = obj[i].summary_date;
+        console.log(id + ': activity score ' + obj[i].score);
         bulk.push({index: {_index: c8.type(activitySummaryIndex)._index, _type: c8._type, _id: id}});
         bulk.push(obj[i]);
         if (activityMETData && activityMETData.length) {
-          var d = moment(summaryDate).hour(4).minute(0).second(0).millisecond(0);
+          var d = moment(obj[i].summary_date).hour(4).minute(0).second(0).millisecond(0);
           var duration = 60; // seconds
           for (var j=0; j<activityMETData.length; j++) {
             d.add(1, 'minutes');
@@ -375,7 +417,7 @@ function getActivity(c8, client, start, end) {
           }
         }
         if (activityClassData && activityClassData.length) {
-          var d = moment(summaryDate).hour(4).minute(0).second(0).millisecond(0);
+          var d = moment(obj[i].summary_date).hour(4).minute(0).second(0).millisecond(0);
           var duration = 5 * 60; // seconds
           for (var j=0; j<activityClassData.length; j++) {
             d.add(5, 'minutes');
@@ -385,7 +427,9 @@ function getActivity(c8, client, start, end) {
         }
       }
       if (bulk.length > 0) {
-        c8.bulk(bulk).then(function(result) {
+        // console.log(JSON.stringify(bulk, null, 1));
+        c8.bulk(bulk).then(function(response) {
+          let result = c8.trimBulkResults(response);
           fulfill('Indexed ' + result.items.length + ' activity documents in ' + result.took + ' ms.');
         }).catch(function(error) {
           reject(error);
@@ -407,13 +451,15 @@ function getReadiness(c8, client, start, end) {
       var obj = response.readiness;
       for (var i=0; i<obj.length; i++) {
         var summaryDate = obj[i].summary_date;
-        console.log(summaryDate);
-        var id = obj[i].timestamp = summaryDate;
+        console.log(summaryDate + ': readiness score ' + obj[i].score);
+        obj[i].timestamp = moment(obj[i].summary_date).hour(4).add(1, 'days');
+        var id = obj[i].summary_date + '.' + obj[i].period_id;
         bulk.push({index: {_index: c8.type(readinessSummaryIndex)._index, _type: c8._type, _id: id}});
         bulk.push(obj[i]);
       }
       if (bulk.length > 0) {
-        c8.bulk(bulk).then(function(result) {
+        c8.bulk(bulk).then(function(response) {
+          let result = c8.trimBulkResults(response);
           fulfill('Indexed ' + result.items.length + ' readiness documents in ' + result.took + ' ms.');
         }).catch(function(error) {
           reject(error);

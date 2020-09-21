@@ -217,7 +217,8 @@ adapter.importData = function(c8, conf, opts) {
         console.log(costBulk, null, 2);
         let promises = [];
         if (bulk.length > 0) {
-          let bp = c8.type(adapter.types[0].name).bulk(bulk).then(function(result) {
+          let bp = c8.type(adapter.types[0].name).bulk(bulk).then(function(response) {
+            let result = c8.trimBulkResults(response);
             if (result.errors) {
               var messages = [];
               for (var i=0; i<result.items.length; i++) {
@@ -238,7 +239,8 @@ adapter.importData = function(c8, conf, opts) {
           fulfill('No data available');
         }
         if (costBulk.length > 0) {
-          let cbp = c8.type(adapter.types[1].name).bulk(costBulk).then(function(result) {
+          let cbp = c8.type(adapter.types[1].name).bulk(costBulk).then(function(response) {
+            let result = c8.trimBulkResults(response);
             if (result.errors) {
               var messages = [];
               for (var i=0; i<result.items.length; i++) {

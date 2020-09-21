@@ -4,14 +4,17 @@
   "description": "Import data from Google My Activity history (Takeout) into Correl8.me",
   "main": "index.js",
   "dependencies": {
-    "compressing": "^1.2.3",
-    "correl8-cli": "^0.1.1",
-    "googleapis": "^26.0.1",
-    "htmlparser2": "^3.9.2",
-    "moment": "^2.20.1",
+    "compressing": "^1.5.1",
+    "correl8-cli": "^0.1.5",
+    "googleapis": "^59.0.0",
+    "htmlparser2": "^4.1.0",
+    "moment": "^2.28.0",
     "prompt": "^1.0.0",
-    "request": "^2.83.0",
-    "unzipper": "^0.8.9"
+    "request": "^2.88.2",
+    "request-stream": "^1.2.2",
+    "stream-chain": "^2.2.3",
+    "stream-json": "^1.7.1",
+    "tar": "^6.0.5"
   },
   "devDependencies": {},
   "scripts": {

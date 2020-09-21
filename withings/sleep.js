@@ -1,18 +1,18 @@
-var express = require('express'),
+const express = require('express'),
   moment = require('moment'),
   url = require('url'),
   Withings = require('withings-oauth2').Withings
 
-var redirectUri = 'http://localhost:9484/authcallback';
+const redirectUri = 'http://localhost:9484/authcallback';
 
-var MAX_DAYS = 7;
-var MS_IN_DAY = 24 * 60 * 60 * 1000;
-var states = ['awake', 'light sleep', 'deep sleep', 'REM sleep'];
+const MAX_DAYS = 7;
+const MS_IN_DAY = 24 * 60 * 60 * 1000;
+const states = ['awake', 'light sleep', 'deep sleep', 'REM sleep'];
 
-var adapter = {};
+let adapter = {};
 
 adapter.sensorName = 'withings';
-var indexName = 'withings-sleep';
+let indexName = 'withings-sleep';
 
 adapter.types = [
   {
@@ -23,7 +23,28 @@ adapter.types = [
       "enddate": "date",
       "state": "keyword",
       "stateid": "integer",
-      "duration": "integer"
+      "duration": "float"
+    }
+  },
+  {
+    name: indexName + 'summary',
+    fields: {
+      "timestamp": "date",
+      "startdate": "date",
+      "enddate": "date",
+      "modified": "date",
+      "date": "keyword",
+      "timezone": "keyword",
+      "totalsleepduration": "float",
+      "data": {
+        "wakeupduration": "float",
+        "lightsleepduration": "float",
+        "deepsleepduration": "float",
+        "remsleepduration": "float",
+        "durationtosleep": "float",
+        "durationtowakeup": "float",
+        "wakeupcount": "float"
+      }
     }
   }
 ];
@@ -44,15 +65,15 @@ adapter.promptProps = {
 };
 
 adapter.storeConfig = function(c8, result) {
-  var conf = result;
+  let conf = result;
   return c8.config(conf).then(function(){
-    var defaultUrl = url.parse(conf.callbackUrl);
-    var express = require('express');
-    var app = express();
-    var port = process.env.PORT || defaultUrl.port;
+    let defaultUrl = url.parse(conf.callbackUrl);
+    let express = require('express');
+    let app = express();
+    let port = process.env.PORT || defaultUrl.port;
 
-    var client = new Withings(conf);
-    var server = app.listen(port, function () {
+    let client = new Withings(conf);
+    let server = app.listen(port, function () {
       client.getRequestToken(function (err, token, tokenSecret) {
         if (err) {
           return;
@@ -60,16 +81,16 @@ adapter.storeConfig = function(c8, result) {
         conf.token = token;
         conf.tokenSecret = tokenSecret;
         return c8.config(conf).then(function(){
-          var authUri = client.authorizeUrl(token, tokenSecret);
+          let authUri = client.authorizeUrl(token, tokenSecret);
           console.log("Please, go to \n" + authUri);
         });
       });
     });
 
     app.get(defaultUrl.pathname, function (req, res) {
-      var verifier = req.query.oauth_verifier;
+      let verifier = req.query.oauth_verifier;
       conf.userID = req.query.userid;
-      var client = new Withings(conf);
+      let client = new Withings(conf);
 
       return client.getAccessToken(conf.token, conf.tokenSecret, verifier,
         function (err, token, secret) {
@@ -109,16 +130,16 @@ adapter.importData = function(c8, conf, opts) {
         size: 1,
         sort: [{'timestamp': 'desc'}],
       }).then(function(response) {
-        var resp = c8.trimResults(response);
-        var firstDate = new Date();
-        var lastDate = opts.lastDate || new Date();
+        let resp = c8.trimResults(response);
+        let firstDate = new Date();
+        let lastDate = opts.lastDate || new Date();
         firstDate.setTime(lastDate.getTime() - (MAX_DAYS * MS_IN_DAY));
         if (opts.firstDate) {
           firstDate = new Date(opts.firstDate);
           console.log('Setting first time to ' + firstDate);
         }
         else if (resp && resp.timestamp) {
-          var d = new Date(resp.timestamp);
+          let d = new Date(resp.timestamp);
           firstDate.setTime(d.getTime() + 1);
           console.log('Setting first time to ' + firstDate);
         }
@@ -140,35 +161,40 @@ adapter.importData = function(c8, conf, opts) {
 
 function importData(c8, conf, firstDate, lastDate) {
   return new Promise(function (fulfill, reject){
-    var client = new Withings(conf);
-    var params = {
+    let client = new Withings(conf);
+    let promises = [];
+    let params = {
       startdate: formatDate(firstDate),
       enddate: formatDate(lastDate)
     };
-    client.getAsync('sleep', 'get', params).then(function(data) {
-      var bulk = [];
+    promises[0] = client.getAsync('sleep', 'get', params).then(function(data) {
+      let bulk = [];
       // console.log(JSON.stringify(data));
       if (!data || !data.body || !data.body.series) {
         reject(new Error('Invalid API response: ' + JSON.stringify(data)));
       }
-      var obj = data.body.series;
-      for (var i=0; i<obj.length; i++) {
+      let obj = data.body.series;
+      for (let i=0; i<obj.length; i++) {
         // console.log(JSON.stringify(obj[i]));
-        var values = obj[i];
-        values.timestamp = values.startdate * 1000;
+        let values = obj[i];
+        values.timestamp = values.enddate * 1000;
         values.duration = values.enddate - values.startdate;
+        values.startdate = new Date(values.startdate * 1000);
+        values.enddate = new Date(values.enddate * 1000);
+        values.modified = new Date(values.modified * 1000);
         values.stateid = values.state;
         values.state = states[values.stateid];
-        bulk.push({index: {_index: c8._index, _type: c8._type, _id: values.timestamp}});
+        bulk.push({index: {_index: c8.type(adapter.types[0].name)._index, _type: c8._type, _id: values.timestamp}});
         bulk.push(values);
         // console.log(values);
-        console.log(new Date(values.timestamp));
+        // console.log(new Date(values.timestamp));
       }
       if (bulk.length > 0) {
-        // console.log(bulk);
-        c8.bulk(bulk).then(function(result) {
+        // console.log(JSON.stringify(bulk, null, 2));
+        c8.bulk(bulk).then(function(response) {
+          let result = c8.trimBulkResults(response);
           if (result.errors) {
-            var messages = [];
+            let messages = [];
             for (var i=0; i<result.items.length; i++) {
               if (result.items[i].index.error) {
                 messages.push(i + ': ' + result.items[i].index.error.reason);
@@ -176,22 +202,78 @@ function importData(c8, conf, firstDate, lastDate) {
             }
             reject(new Error(messages.length + ' errors in bulk insert:\n ' + messages.join('\n ')));
           }
-          fulfill('Indexed ' + result.items.length + ' documents in ' + result.took + ' ms.');
+          console.log('Indexed ' + result.items.length + ' sleep measure documents in ' + result.took + ' ms.');
         }).catch(function(error) {
           reject(error);
         });
       }
       else {
-        fulfill('No data available for import.');
+        console.log('No measure data available for import.');
       }
     }).catch(function(error){
       reject(error);
     });
+    params = {
+      startdateymd: formatDate(firstDate, true),
+      enddateymd: formatDate(lastDate, true)
+    };
+    promises[1] = client.getAsync('sleep', 'getsummary', params).then(function(data) {
+      let bulk = [];
+      if (!data || !data.body || !data.body.series) {
+        reject(new Error('Invalid API response: ' + JSON.stringify(data)));
+      }
+      let obj = data.body.series;
+      for (var i=0; i<obj.length; i++) {
+        // console.log(JSON.stringify(obj[i]));
+        let values = obj[i];
+        values.timestamp = values.enddate * 1000;
+        values.startdate = new Date(values.startdate * 1000);
+        values.enddate = new Date(values.enddate * 1000);
+        values.modified = new Date(values.modified * 1000);
+        values.totalsleepduration = values.data.lightsleepduration + values.data.deepsleepduration + values.data.remsleepduration;
+        bulk.push({index: {_index: c8.type(adapter.types[1].name)._index, _type: c8._type, _id: values.id}});
+        bulk.push(values);
+        // console.log(values);
+        console.log(values.date + ': ' + Math.round(values.totalsleepduration/360)/10 + ' hours of sleep');
+      }
+      if (bulk.length > 0) {
+        // console.log(JSON.stringify(bulk, null, 2));
+        c8.bulk(bulk).then(function(response) {
+          let result = c8.trimBulkResults(response);
+          if (result.errors) {
+            let messages = [];
+            for (var i=0; i<result.items.length; i++) {
+              if (result.items[i].index.error) {
+                messages.push(i + ': ' + result.items[i].index.error.reason);
+              }
+            }
+            reject(new Error(messages.length + ' errors in bulk insert:\n ' + messages.join('\n ')));
+          }
+          console.log('Indexed ' + result.items.length + ' sleep summary documents in ' + result.took + ' ms.');
+        }).catch(function(error) {
+          reject(error);
+        });
+      }
+      else {
+        console.log('No summary data available for import.');
+      }
+    }).catch(function(error){
+      reject(error);
+    });
+    Promise.all(promises).then((res) => {
+      fulfill('Indexed measures and summaries.');
+    });
   });
 }
 
-function formatDate(date) {
-  return Math.round(date.getTime()/1000);
+function formatDate(date, ymd) {
+  if (!ymd) {
+    return Math.round(date.getTime()/1000);
+  }
+  let y = date.getFullYear();
+  let m = date.getMonth() + 1;
+  let d = date.getDate();
+  return y + '-' + (m<10 ? '0' : '') + m + '-' + (d<10 ? '0' : '') + d;
 }
 
 module.exports = adapter;

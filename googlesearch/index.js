@@ -194,7 +194,8 @@ function processTakeoutFile(oauth2Client, file, c8, conf) {
     stream.setMaxListeners(MAX_ZIP_ENTRIES)
     .on('end', () => {
       if (bulk.length > 0) {
-        c8.bulk(bulk).then(result => {
+        c8.bulk(bulk).then(response => {
+          let result = c8.trimBulkResults(response);
           finishedBatches++;
           if (result.errors) {
             if (result.items) {
@@ -259,7 +260,8 @@ function processTakeoutFile(oauth2Client, file, c8, conf) {
         fileQueries += queries.event.length;
         // temporarily do this here (since zip never ends)
         if (bulk.length > 0) {
-          c8.bulk(bulk).then(result => {
+          c8.bulk(bulk).then(response => {
+            let result = c8.trimBulkResults(response);
             finishedBatches++;
             if (result.errors) {
               if (result.items) {
@@ -294,7 +296,8 @@ function processTakeoutFile(oauth2Client, file, c8, conf) {
     });
     eos(stream, function(err) {
       if (bulk.length > 0) {
-        c8.bulk(bulk).then(result => {
+        c8.bulk(bulk).then(response => {
+          let result = c8.trimBulkResults(response);
           finishedBatches++;
           if (result.errors) {
             if (result.items) {

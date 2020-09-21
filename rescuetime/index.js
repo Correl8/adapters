@@ -84,8 +84,10 @@ adapter.importData = function(c8, conf, opts) {
           var bulk = [];
           for (var i=0; i<data.length; i++) {
             var id = data[i][0] + '-' + data[i][3]; // unique enough?
-            var tz = new Date(data[i][0]).getTimezoneOffset();
-            var d = new Date(data[i][0]).getTime() + (tz * 60 * 1000);
+            var d = new Date(data[i][0]);
+            // var tz = new Date(data[i][0]).getTimezoneOffset();
+            // console.log(tz);
+            // d.setTime(d.getTime() + (tz * 60 * 1000));
             var dString = new Date(d).toISOString();
             bulk.push({index: {_index: c8._index, _type: c8._type, _id: id}});
             bulk.push({
@@ -99,7 +101,8 @@ adapter.importData = function(c8, conf, opts) {
             console.log(dString);
           }
           if (bulk.length > 0) {
-            c8.bulk(bulk).then(function(result) {
+            c8.bulk(bulk).then(function(response) {
+              let result = c8.trimBulkResults(response);
               if (result.errors) {
                 var messages = [];
                 for (var i=0; i<result.items.length; i++) {

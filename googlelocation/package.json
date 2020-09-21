@@ -4,13 +4,16 @@
   "description": "Import data from Google location history (Takeout) into Correl8.me",
   "main": "index.js",
   "dependencies": {
-    "JSONStream": "^1.3.2",
-    "compressing": "^1.2.3",
-    "correl8-cli": "^0.1.0",
-    "end-of-stream": "^1.4.1",
-    "googleapis": "^26.0.1",
+    "JSONStream": "^1.3.5",
+    "compressing": "^1.5.0",
+    "correl8-cli": "^0.1.3",
+    "end-of-stream": "^1.4.4",
+    "googleapis": "^47.0.0",
+    "moment": "^2.24.0",
     "prompt": "^1.0.0",
-    "request": "^2.83.0"
+    "request": "^2.88.2",
+    "tar": "^6.0.1",
+    "unzip-stream": "^0.3.0"
   },
   "devDependencies": {},
   "scripts": {

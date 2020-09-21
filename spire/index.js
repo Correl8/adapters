@@ -81,7 +81,8 @@ adapter.importData = function(c8, conf, opts) {
         bulk.push(obj);
       }
       if (bulk.length > 0) {
-        return c8.bulk(bulk).then(function(result) {
+        return c8.bulk(bulk).then(function(response) {
+          let result = c8.trimBulkResults(response);
           console.log('Indexed ' + result.items.length + ' events in ' + result.took + ' ms.');
         }).catch(function(error) {
           console.trace(error);
@@ -109,7 +110,8 @@ adapter.importData = function(c8, conf, opts) {
         streakBulk.push(obj);
       }
       if (streakBulk.length > 0) {
-        c8.bulk(streakBulk).then(function(result) {
+        c8.bulk(streakBulk).then(function(response) {
+          let result = c8.trimBulkResults(response);
           console.log('Indexed ' + result.items.length + ' streak documents in ' + result.took + ' ms.');
           fulfill(result);
         }).catch(function(error) {
@@ -194,8 +196,9 @@ adapter.importData = function(c8, conf, opts) {
 
           let date = firstDate;
           while (date < lastDate) {
-            console.log(date);
+            // console.log(date);
             client.events(date).then(function(data) {
+              // console.log(data);
               var bulk = [];
               for (var i=0; i<data.length; i++) {
                 var obj = data[i];
@@ -205,8 +208,10 @@ adapter.importData = function(c8, conf, opts) {
                 bulk.push({index: {_index: c8.type(eventIndex)._index, _type: c8._type, _id: id}});
                 bulk.push(obj);
               }
+              console.log(JSON.stringify(bulk, null, 1));
               if (bulk.length > 0) {
-                c8.bulk(bulk).then(function(result) {
+                c8.bulk(bulk).then(function(response) {
+                let result = c8.trimBulkResults(response);
                   console.log('Indexed ' + result.items.length + ' events in ' + result.took + ' ms.');
                 }).catch(function(error) {
                   reject(error);
@@ -223,7 +228,8 @@ adapter.importData = function(c8, conf, opts) {
           }
 
           if (streakBulk.length > 0) {
-            c8.bulk(streakBulk).then(function(result) {
+            c8.bulk(streakBulk).then(function(response) {
+              let result = c8.trimBulkResults(response);
               if (result.errors) {
                 var messages = [];
                 for (var i=0; i<result.items.length; i++) {

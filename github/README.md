@@ -2,23 +2,25 @@
 
 ## Quick start
 
-[Register your client](https://github.com/settings/applications/new) (this adapter) to Github.
+[https://help.github.com/articles/creating-a-personal-access-token-for-the-command-line/](Create a personal access token for the command line). Grant the scopes `repo:status` and `read:user`.
 
-Run
+
+### Initialize
 
     # initialize indices
-    node app.js --init
+    npm start --init
     # allow API access to your data
-    node app.js --authenticate
+    npm start --settings
 
 Follow the instructions in the console to authorize the app and store the OAuth token.
 
-    # first run with an initial date
-    node app.js --from 2001-01-01
-    # for next runs, date range is automatic
+### Run
+    npm start
+
+### Automate
 
 Consider running the adapter from cron. Add something like the following into
 your crontab (run `crontab -e`):
 
-    0 * * * * /usr/bin/node <path to here>/app.js
+    0 * * * * /usr/bin/node <path to adapters>/github/node_modules/correl8-cli/app.js -a <path to adapters>/github
 

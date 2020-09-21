@@ -179,7 +179,8 @@ adapter.importData = function(c8, conf, opts) {
                 if (bulk.length > 0) {
                   // console.log(bulk);
                   // return;
-                  c8.bulk(bulk).then(function(result) {
+                  c8.bulk(bulk).then(function(response) {
+                    let result = c8.trimBulkResults(response);
                     if (result.errors) {
                       let errors = [];
                       for (let x=0; x<result.items.length; x++) {
@@ -287,7 +288,8 @@ function indexCSV(fileName, reader, c8) {
       if (bulk.length > 0) {
         // console.log(JSON.stringify(bulk, null, 1));
         // return;
-        c8.bulk(bulk).then(function(result) {
+        c8.bulk(bulk).then(function(response) {
+        let result = c8.trimBulkResults(response);
           if (result.errors) {
             let errors = [];
             for (let x=0; x<result.items.length; x++) {

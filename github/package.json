@@ -4,9 +4,9 @@
   "description": "Import data from Github Events API into Correl8.me",
   "main": "index.js",
   "dependencies": {
-    "correl8-cli": "^0.1.0",
-    "github": "^0.2.4",
-    "passwoid": "^4.0.3"
+    "correl8-cli": "^0.1.1",
+    "node-github-graphql": "^0.2.6",
+    "password": "^0.1.1"
   },
   "scripts": {
     "start": "node node_modules/correl8-cli/app.js -a ../../index.js"

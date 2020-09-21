@@ -144,7 +144,8 @@ adapter.importData = function(c8, conf, opts) {
         }
         // console.log(bulk);
         if (bulk.length > 0) {
-          c8.bulk(bulk).then(function(result) {
+          c8.bulk(bulk).then(function(response) {
+            let result = c8.trimBulkResults(response);
             if (result.errors) {
               var messages = [];
               for (var i=0; i<result.items.length; i++) {

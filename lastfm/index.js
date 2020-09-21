@@ -121,7 +121,8 @@ function getRecent(c8, lfm, params) {
       }
       // console.log(JSON.stringify(bulk, null, 2));
       if (bulk.length > 0) {
-        c8.bulk(bulk).then(function(result) {
+        c8.bulk(bulk).then(function(response) {
+          let result = c8.trimBulkResults(response);
           if (result.errors) {
             var messages = [];
             for (var i=0; i<result.items.length; i++) {
