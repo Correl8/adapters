@@ -12,7 +12,7 @@ const path = require('path');
 
 const SCOPES = ['https://www.googleapis.com/auth/drive'];
 
-const MAX_FILES = 1;
+const MAX_FILES = 5;
 const MAX_ZIP_ENTRIES = 100;
 const MAX_BULK_BATCH = 5000;
 
@@ -132,7 +132,7 @@ adapter.importData = function(c8, conf, opts) {
     // console.log(JSON.stringify(conf.credentials));
     drive.files.list({
       auth: oauth2Client,
-      spaces: drive,
+      spaces: "drive",
       q: "trashed != true and '" + conf.inputDir + "' in parents and mimeType='application/x-gtar'",
       pageSize: MAX_FILES,
       fields: "files(id, name)"
@@ -216,31 +216,98 @@ adapter.importData = function(c8, conf, opts) {
           .on('entry', function(header, substream, next) {
             if (header.type != 'file' || header.name == 'index.html' < 0 || header.name.indexOf('.html') < 0) {
               console.log('Skipping ' + header.type + ' ' + header.name);
-              return;
+              // stream.resume();
+              // next();
             }
-            // console.log(header.mtime + ': ' + header.name + ' (' + Math.round(header.size/1024) + ' kB)');
-            fileActions = 0;
-            eos(substream, function(err) {
-              if (err) {
-                return console.log('stream had an error or closed early');
-              }
-              // console.log('stream has ended', this === substream);
-            });
-            let openedClass = '';
-            let bulk = [];
-            let action = new ActionObject();
-            let currentArray = action.actions;
-            let parser = new htmlparser.Parser({
-              onopentag: (tag, attrs) => {
-                let myClass = handleOpenTag(tag, attrs);
-                if (tag == 'a' && attrs.href) {
-                  action.links.push(attrs.href);
+            // else {
+              // console.log(header.mtime + ': ' + header.name + ' (' + Math.round(header.size/1024) + ' kB)');
+              fileActions = 0;
+              eos(substream, function(err) {
+                if (err) {
+                  return console.log('stream had an error or closed early');
                 }
-                else if ((myClass == 'caption') || (myClass == 'content')) {
-                  openedClass = myClass;
+                // console.log('stream has ended', this === substream);
+              });
+              let openedClass = '';
+              let bulk = [];
+              let action = new ActionObject();
+              let currentArray = action.actions;
+              let parser = new htmlparser.Parser({
+                onopentag: (tag, attrs) => {
+                  let myClass = handleOpenTag(tag, attrs);
+                  if (tag == 'a' && attrs.href) {
+                    action.links.push(attrs.href);
+                  }
+                  else if ((myClass == 'caption') || (myClass == 'content')) {
+                    openedClass = myClass;
+                  }
+                  if ((myClass == 'content') && action.timestamp) {
+                    let i;
+                    let values = action.toValues();
+                    let meta = {
+                      index: {
+                        _index: c8._index, _type: c8._type, _id: values.timestamp + '-' + values.service
+                      }
+                    };
+                    bulk.push(meta);
+                    bulk.push(values);
+                    fileActions++;
+                    totalActions++;
+                    if (bulk.length >= (MAX_BULK_BATCH * 2)) {
+                      stream.pause();
+                      let clone = bulk.slice(0);
+                      bulk = [];
+                      results.push(indexBulk(clone, conf, c8).catch((error) => {reject(new Error(error));}));
+                      // console.log('Started ' + results.length + ' bulk batches (' + clone[1].timestamp + ')');
+                    }
+                    action = new ActionObject();
+                    currentArray = action.actions;
+                  }
+                },
+                ontext: (text) => {
+                  if (openedClass == 'caption') {
+                    action.captions.push(text);
+                  }
+                  else if (openedClass == 'content') {
+                    let i;
+                    if (text.indexOf('Details:') >= 0) {
+                      currentArray = action.details;
+                    }
+                    else if (text.indexOf('Locations:') >= 0) {
+                      currentArray = action.locations;
+                    }
+                    else if (text.indexOf('Products:') >= 0) {
+                      currentArray = action.products;
+                    }
+                    else if (i = text.match(/maps\?q=([\d.]+,[\d.]+)/)) {
+                      action.coords = i[1];
+                    }
+                    else if ((i = moment(text, 'MMM D, YYYY, H:mm:ss A').isValid())) {
+                      action.timestamp = moment(text, 'MMM D, YYYY, H:mm:ss A');
+                      action.timestamp.utcOffset(0);
+                      action.dateString = text;
+                    }
+                    else {
+                      currentArray.push(text);
+                    }
+                  }
+                },
+                onclosetag: (tag) => {
+                  if (tag == 'br') {
+                    currentArray.push(' ');
+                  }
                 }
-                if ((myClass == 'content') && action.timestamp) {
-                  let i;
+              },
+              {
+                normalizeWhitespace: true,
+                decodeEntities: true
+              });
+              let decoder = new StringDecoder('utf8');
+              substream.on('data', function(buff) {
+                parser.parseChunk(decoder.write(buff));
+              })
+              .on('end', function() {
+                if (action.timestamp) {
                   let values = action.toValues();
                   let meta = {
                     index: {
@@ -251,84 +318,21 @@ adapter.importData = function(c8, conf, opts) {
                   bulk.push(values);
                   fileActions++;
                   totalActions++;
-                  if (bulk.length >= (MAX_BULK_BATCH * 2)) {
-                    stream.pause();
-                    let clone = bulk.slice(0);
-                    bulk = [];
-                    results.push(indexBulk(clone, conf, c8).catch((error) => {reject(new Error(error));}));
-                    // console.log('Started ' + results.length + ' bulk batches (' + clone[1].timestamp + ')');
-                  }
-                  action = new ActionObject();
-                  currentArray = action.actions;
                 }
-              },
-              ontext: (text) => {
-                if (openedClass == 'caption') {
-                  action.captions.push(text);
+                parser.end();
+                if (bulk.length > 0) {
+                  results.push(indexBulk(bulk, conf, c8).catch((error) => {reject(new Error(error));}));
+                  // console.log('Started ' + results.length + ' bulk batches (' + bulk[1].timestamp + ', last of ' + header.name + ')');
                 }
-                else if (openedClass == 'content') {
-                  let i;
-                  if (text.indexOf('Details:') >= 0) {
-                    currentArray = action.details;
-                  }
-                  else if (text.indexOf('Locations:') >= 0) {
-                    currentArray = action.locations;
-                  }
-                  else if (text.indexOf('Products:') >= 0) {
-                    currentArray = action.products;
-                  }
-                  else if (i = text.match(/maps\?q=([\d.]+,[\d.]+)/)) {
-                    action.coords = i[1];
-                  }
-                  else if ((i = moment(text, 'MMM D, YYYY, H:mm:ss A').isValid())) {
-                    action.timestamp = moment(text, 'MMM D, YYYY, H:mm:ss A');
-                    action.dateString = text;
-                  }
-                  else {
-                    currentArray.push(text);
-                  }
-                }
-              },
-              onclosetag: (tag) => {
-                if (tag == 'br') {
-                  currentArray.push(' ');
-                }
-              }
-            },
-            {
-              normalizeWhitespace: true,
-              decodeEntities: true
-            });
-            let decoder = new StringDecoder('utf8');
-            substream.on('data', function(buff) {
-              parser.parseChunk(decoder.write(buff));
-            })
-            .on('end', function() {
-              if (action.timestamp) {
-                let values = action.toValues();
-                let meta = {
-                  index: {
-                    _index: c8._index, _type: c8._type, _id: values.timestamp + '-' + values.service
-                  }
-                };
-                bulk.push(meta);
-                bulk.push(values);
-                fileActions++;
-                totalActions++;
-              }
-              parser.end();
-              if (bulk.length > 0) {
-                results.push(indexBulk(bulk, conf, c8).catch((error) => {reject(new Error(error));}));
-                // console.log('Started ' + results.length + ' bulk batches (' + bulk[1].timestamp + ', last of ' + header.name + ')');
-              }
-              console.log(header.name + ': ' + fileActions + ' activities.');
-              next();
-            })
-            .on('error', (error) => {
-              console.log('Error processing ' + header.name);
-              console.log(new Error(error));
-              // reject(error);
-            });
+                console.log(header.name + ': ' + fileActions + ' activities.');
+                next();
+              })
+              .on('error', (error) => {
+                console.log('Error processing ' + header.name);
+                console.log(new Error(error));
+                // reject(error);
+              });
+            // }
           })
           .on('end', function() {
             console.log('Happy ending!');
