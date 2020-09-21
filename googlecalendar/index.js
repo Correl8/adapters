@@ -209,8 +209,10 @@ adapter.importData = function(c8, conf, opts) {
           sort: [{'timestamp': 'desc'}],
         };
       }
-      c8.msearch(params).then(function(response) {
+      c8.msearch(params).then(function(resp) {
+        let response = c8.trimBulkResults(resp);
         if (!response || !response.responses) {
+          console.log(response);
           return;
         }
         // console.log(response);
@@ -287,7 +289,8 @@ adapter.importData = function(c8, conf, opts) {
             }
             // console.log(bulk);
             if (bulk.length > 0) {
-              c8.bulk(bulk).then(function(result) {
+              c8.bulk(bulk).then(function(response) {
+                let result = c8.trimBulkResults(response);
                 if (result.errors) {
                   var messages = [];
                   for (var i=0; i<result.items.length; i++) {
