@@ -90,65 +90,62 @@ adapter.promptProps = {
   }
 };
 
-adapter.storeConfig = function(c8, result) {
+adapter.storeConfig = async function(c8, result) {
   let conf = result;
-  c8.config(conf).then(function(){
-    if (conf.authconfig && conf.authconfig != 'none') {
-      fs.readFile(conf.authconfig, function (err, content) {
-        if (err) {
-          console.log('Error loading client secret file: ' + err);
-          return;
-        }
-        Object.assign(conf, JSON.parse(content));
-        // console.log(conf);
-        c8.config(conf).then(function(){
-          var auth = google.auth;
-          var clientSecret = conf.installed.client_secret;
-          var clientId = conf.installed.client_id;
-          var redirectUrl = conf.installed.redirect_uris[0];
-          var oauth2Client = new auth.OAuth2(clientId, clientSecret, redirectUrl);
-          var authUrl = oauth2Client.generateAuthUrl({
-            access_type: 'offline',
-            scope: SCOPES
-          });
-          console.log('Authorize this app by visiting this url\n', authUrl, '\n\n');
-          prompt.start();
-          prompt.message = '';
-          var promptProps = {
-            properties: {
-              code: {
-                description: 'Enter the code shown on page'
-              },
-            }
-          }
-          prompt.get(promptProps, function (err, result) {
-            if (err) {
-              console.trace(err);
-            }
-            else {
-              oauth2Client.getToken(result.code, function(err, token) {
-                if (err) {
-                  console.log('Error while trying to retrieve access token', err);
-                  return;
-                }
-                conf.credentials = token;
-                // console.log(conf);
-                c8.config(conf).then(function(){
-                  console.log('Access credentials saved.');
-                  c8.release();
-                  process.exit;
-                });
-              });
-            }
-          });
-        });
+  await c8.config(conf);
+  if (conf.authconfig && conf.authconfig != 'none') {
+    fs.readFile(conf.authconfig, async (err, content) => {
+      if (err) {
+        console.log('Error loading client secret file: ' + err);
+        return;
+      }
+      Object.assign(conf, JSON.parse(content));
+      // console.log(conf);
+      await c8.config(conf);
+      var auth = google.auth;
+      var clientSecret = conf.installed.client_secret;
+      var clientId = conf.installed.client_id;
+      var redirectUrl = conf.installed.redirect_uris[0];
+      var oauth2Client = new auth.OAuth2(clientId, clientSecret, redirectUrl);
+      var authUrl = oauth2Client.generateAuthUrl({
+        access_type: 'offline',
+        scope: SCOPES
       });
-    }
-  });
+      console.log('Authorize this app by visiting this url\n', authUrl, '\n\n');
+      prompt.start();
+      prompt.message = '';
+      var promptProps = {
+        properties: {
+          code: {
+            description: 'Enter the code shown on page'
+          },
+        }
+      }
+      prompt.get(promptProps, (err, result) => {
+        if (err) {
+          console.trace(err);
+        }
+        else {
+          oauth2Client.getToken(result.code, async (err, token) => {
+            if (err) {
+              console.log('Error while trying to retrieve access token', err);
+              return;
+            }
+            conf.credentials = token;
+            // console.log(conf);
+            await c8.config(conf);
+            console.log('Access credentials saved.');
+            c8.release();
+            process.exit;
+          });
+        }
+      });
+    });
+  }
 };
 
 adapter.importData = function(c8, conf, opts) {
-  return new Promise(function (fulfill, reject){
+  return new Promise((fulfill, reject) => {
     let results = [];
     if (!conf.credentials) {
       reject(new Error('Authentication credentials not found. Configure first!'));
@@ -168,7 +165,7 @@ adapter.importData = function(c8, conf, opts) {
       q: "trashed != true and '" + conf.inputDir + "' in parents and mimeType='application/x-gtar'",
       pageSize: MAX_FILES,
       fields: "files(id, name)"
-    }, function(err, response) {
+    }, (err, response) => {
       if (err) {
         reject(new Error(err));
         return;
@@ -215,7 +212,7 @@ adapter.importData = function(c8, conf, opts) {
 */
           driveStream
           // .setMaxListeners(MAX_ZIP_ENTRIES)
-          .on('error', function (error) {
+          .on('error', (error) => {
             console.error(new Error('driveStream error: ' + error));
             return;
           })
@@ -227,21 +224,21 @@ adapter.importData = function(c8, conf, opts) {
             console.log('Skipping ' + path);
             return false;
           }}))
-          .on('error', function (error) {
+          .on('error', (error) => {
             console.error(new Error('tar.x stream error: ' + error));
             return;
           })
-          .on('entry', function(substream) {
+          .on('entry', (substream) => {
             // console.log(substream);
             console.log(substream.mtime + ': ' + substream.path + ' (' + Math.round(substream.size/1024) + ' kB)');
-            eos(substream, function(err) {
+            eos(substream, (err) => {
               if (err) {
                 return console.log('tar entry stream had an error or closed early');
               }
             });
             let parse = JSONStream.parse('locations.*');
             substream.pipe(parse)
-            .on('data', function(data) {
+            .on('data', (data) => {
               // console.log(JSON.stringify(data));
               let start = moment(Number(data.timestampMs));
               let values = {
@@ -294,7 +291,7 @@ adapter.importData = function(c8, conf, opts) {
                 // setTimeout(driveStream.resume, BULK_BATCH_MS);
               }
             })
-            .on('end', function() {
+            .on('end', () => {
               console.log('Last batch of ' + substream.path + '!');
               if (bulk.length > 0) {
                 results.push(indexBulk(bulk, conf, c8).catch(reject));
@@ -308,7 +305,7 @@ adapter.importData = function(c8, conf, opts) {
               // reject(error);
             });
           })
-          .on('finished', function() {
+          .on('finished', () => {
             console.log('Happy ending!');
               if (finishedBatches > 0) {
                 var updateParams = {
@@ -344,28 +341,27 @@ adapter.importData = function(c8, conf, opts) {
 };
 
 function indexBulk(bulkData, oonf, c8) {
-  return new Promise(function (fulfill, reject){
-    c8.bulk(bulkData).then(function(response) {
-      let result = c8.trimBulkResults(response);
-      if (result.errors) {
-        if (result.items) {
-          let errors = [];
-          for (let x=0; x<result.items.length; x++) {
-            if (result.items[x].index.error) {
-              errors.push(x + ': ' + result.items[x].index.error.reason);
-            }
+  return new Promise(async (fulfill, reject) => {
+    let response = await c8.bulk(bulkData);
+    let result = c8.trimBulkResults(response);
+    if (result.errors) {
+      if (result.items) {
+        let errors = [];
+        for (let x=0; x<result.items.length; x++) {
+          if (result.items[x].index.error) {
+            errors.push(x + ': ' + result.items[x].index.error.reason);
           }
-          reject(new Error(fileName + ': ' + errors.length + ' errors in bulk insert:\n ' + errors.join('\n ')));
         }
-        else {
-          reject(new Error(JSON.stringify(result.errors))); 
-        }
+        reject(new Error(fileName + ': ' + errors.length + ' errors in bulk insert:\n ' + errors.join('\n ')));
       }
-      console.log('Finished ' + (++finishedBatches) + ' bulk batches.');
-      driveStream.resume();
-      // process.stdout.write('>');
-      fulfill(result);
-    }).catch(reject);
+      else {
+        reject(new Error(JSON.stringify(result.errors))); 
+      }
+    }
+    console.log('Finished ' + (++finishedBatches) + ' bulk batches.');
+    driveStream.resume();
+    // process.stdout.write('>');
+    fulfill(result);
   });
 }
 
