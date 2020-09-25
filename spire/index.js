@@ -14,7 +14,20 @@ adapter.types = [
   {
     name: streakIndex,
     fields: {
-      timestamp: "date",
+      "@timestamp": "date",
+      "ecs": {
+        "version": 'keyword'
+      },
+      "event": {
+        "created": "date",
+        "dataset": "keyword",
+        "duration": "long",
+        "end": "date",
+        "module": "keyword",
+        "original": "keyword",
+        "start": "date",
+        "timezone": "keyword"
+      },
       type: "string",
       original_type: "string",
       modified_type: "string",
@@ -196,9 +209,8 @@ adapter.importData = function(c8, conf, opts) {
 
           let date = firstDate;
           while (date < lastDate) {
-            // console.log(date);
+            console.log(date);
             client.events(date).then(function(data) {
-              // console.log(data);
               var bulk = [];
               for (var i=0; i<data.length; i++) {
                 var obj = data[i];
@@ -208,7 +220,6 @@ adapter.importData = function(c8, conf, opts) {
                 bulk.push({index: {_index: c8.type(eventIndex)._index, _type: c8._type, _id: id}});
                 bulk.push(obj);
               }
-              console.log(JSON.stringify(bulk, null, 1));
               if (bulk.length > 0) {
                 c8.bulk(bulk).then(function(response) {
                 let result = c8.trimBulkResults(response);
