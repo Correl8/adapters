@@ -32,13 +32,28 @@ adapter.types = [
   {
     name: torqueIndex,
     fields: {
-      "timestamp": "date",
-      "session": "string",
-      "GPS Time": "date",
-      "Device Time": "date",
-      "Longitude": "float",
-      "Latitude": "float",
-      "coords": "geo_point"
+      "@timestamp": "date",
+      "ecs": {
+        "version": 'keyword'
+      },
+      "event": {
+        "created": "date",
+        "dataset": "keyword",
+        "module": "keyword",
+        "original": "keyword",
+        "start": "date",
+      },
+      "geo": {
+        "location": "geo_point"
+      },
+      "odb2": {
+        "timestamp": "date",
+        "session": "string",
+        "GPS Time": "date",
+        "Device Time": "date",
+        "Longitude": "float",
+        "Latitude": "float",
+      }
     }
   }
 ];
@@ -58,65 +73,63 @@ adapter.promptProps = {
   }
 };
 
-adapter.storeConfig = function(c8, result) {
+adapter.storeConfig = async (c8, result) => {
   let conf = result;
-  c8.config(conf).then(function(){
-    if (conf.authconfig && conf.authconfig != 'none') {
-      fs.readFile(conf.authconfig, function (err, content) {
-        if (err) {
-          console.log('Error loading client secret file: ' + err);
-          return;
-        }
-        Object.assign(conf, JSON.parse(content));
-        // console.log(conf);
-        c8.config(conf).then(function(){
-          var auth = new googleAuth();
-          var clientSecret = conf.installed.client_secret;
-          var clientId = conf.installed.client_id;
-          var redirectUrl = conf.installed.redirect_uris[0];
-          var oauth2Client = new auth.OAuth2(clientId, clientSecret, redirectUrl);
-          var authUrl = oauth2Client.generateAuthUrl({
-            access_type: 'offline',
-            scope: SCOPES
-          });
-          console.log('Authorize this app by visiting this url\n', authUrl, '\n\n');
-          prompt.start();
-          prompt.message = '';
-          var promptProps = {
-            properties: {
-              code: {
-                description: 'Enter the code shown on page'
-              },
-            }
-          }
-          prompt.get(promptProps, function (err, result) {
-            if (err) {
-              console.trace(err);
-            }
-            else {
-              oauth2Client.getToken(result.code, function(err, token) {
-                if (err) {
-                  console.log('Error while trying to retrieve access token', err);
-                  return;
-                }
-                conf.credentials = token;
-                // console.log(conf);
-                c8.config(conf).then(function(){
-                  console.log('Access credentials saved.');
-                  c8.release();
-                  process.exit;
-                });
-              });
-            }
-          });
-        });
+  await c8.config(conf);
+  if (conf.authconfig && conf.authconfig != 'none') {
+    fs.readFile(conf.authconfig, async (err, content) => {
+      if (err) {
+        console.log('Error loading client secret file: ' + err);
+        return;
+      }
+      Object.assign(conf, JSON.parse(content));
+      // console.log(conf);
+      await c8.config(conf);
+      const auth = new googleAuth();
+      const clientSecret = conf.installed.client_secret;
+      const clientId = conf.installed.client_id;
+      const redirectUrl = conf.installed.redirect_uris[0];
+      const oauth2Client = new auth.OAuth2(clientId, clientSecret, redirectUrl);
+      const authUrl = oauth2Client.generateAuthUrl({
+        access_type: 'offline',
+        scope: SCOPES
       });
-    }
-  });
+      console.log('Authorize this app by visiting this url\n', authUrl, '\n\n');
+      prompt.start();
+      prompt.message = '';
+      var promptProps = {
+        properties: {
+          code: {
+            description: 'Enter the code shown on page'
+          },
+        }
+      }
+      prompt.get(promptProps, (err, result) => {
+        if (err) {
+          console.trace(err);
+        }
+        else {
+          oauth2Client.getToken(result.code, (err, token) => {
+            if (err) {
+              console.log('Error while trying to retrieve access token', err);
+              return;
+            }
+            conf.credentials = token;
+            // console.log(conf);
+            c8.config(conf).then(() => {
+              console.log('Access credentials saved.');
+              c8.release();
+              process.exit;
+            });
+          });
+        }
+      });
+    });
+  }
 };
 
-adapter.importData = function(c8, conf, opts) {
-  return new Promise(function (fulfill, reject){
+adapter.importData = (c8, conf, opts) => {
+  return new Promise(async (fulfill, reject) => {
     let results = [];
     if (conf.credentials) {
       // use Google Drive
@@ -134,7 +147,8 @@ adapter.importData = function(c8, conf, opts) {
         pageSize: MAX_FILES,
         orderBy: 'modifiedTime desc',
         fields: "files(id, name, webContentLink)"
-      }, function(err, response) {
+      }, (err, response) => {
+        // console.log(response.files);
         if (err) {
           reject(err);
           return;
@@ -146,19 +160,19 @@ adapter.importData = function(c8, conf, opts) {
         else {
           let results = [];
           for (let i = 0; i < files.length; i++) {
-            let file = files[i];
-            let fileName = file.name;
-            drive.files.get({
+            const file = files[i];
+            const fileName = file.name;
+            const opts = {
               auth: oauth2Client,
               fileId: file.id,
               alt: 'media'
-            },
-            function(error, content) {
+            };
+            drive.files.get(opts, (error, content) => {
               if (error) {
                 reject(error);
                 return;
               }
-              parse(content, csvParserOpts, function(err, parsed) {
+              parse(content, csvParserOpts, async (err, parsed) => {
                 let bulk = [];
                 if (err) {
                   reject(err);
@@ -169,50 +183,48 @@ adapter.importData = function(c8, conf, opts) {
                 for (let i=0; i<parsed.length; i++) {
                   var returned = prepareRow(parsed[i], fileName, sessionId);
                   // console.log(returned);
-                  data = returned[0];
-                  sessionId = returned[1];
-                  if (data) {
-                    bulk.push({index: {_index: c8._index, _type: c8._type, _id: data.timestamp}});
-                    bulk.push(data);
+                  data = returned;
+                  if (data && data.odb2 && data.odb2.session) {
+                    sessionId = data.odb2.session.replace(/^.*-(\d+)$/, '$1');
+                    if (data.ecs) {
+                      bulk.push({index: {_index: c8._index, _id: data["@timestamp"]}});
+                      bulk.push(data);
+                    }
                   }
                 }
                 if (bulk.length > 0) {
                   // console.log(bulk);
                   // return;
-                  c8.bulk(bulk).then(function(response) {
-                    let result = c8.trimBulkResults(response);
-                    if (result.errors) {
-                      let errors = [];
-                      for (let x=0; x<result.items.length; x++) {
-                        if (result.items[x].index.error) {
-                          errors.push(x + ': ' + result.items[x].index.error.reason);
-                        }
+                  const response = await c8.bulk(bulk);
+                  const result = c8.trimBulkResults(response);
+                  if (result.errors) {
+                    let errors = [];
+                    for (let x=0; x<result.items.length; x++) {
+                      if (result.items[x].index.error) {
+                        errors.push(x + ': ' + result.items[x].index.error.reason);
                       }
-                      reject(new Error(fileName + ': ' + errors.length + ' errors in bulk insert:\n ' + errors.join('\n ')));
+                    }
+                    reject(new Error(fileName + ': ' + errors.length + ' errors in bulk insert:\n ' + errors.join('\n ')));
+                    return;
+                  }
+                  console.log(fileName + ': ' + result.items.length + ' rows, ' + sessionId + ' session' + ((sessionId != 1) ? 's' : ''));
+                  // fulfill(result);
+                  // fulfill('Indexed ' + totalRows + ' log rows in ' + res.length + ' files. Took ' + totalTime + ' ms.');
+                  var updateParams = {
+                    auth: oauth2Client,
+                    fileId: file.id,
+                    addParents: conf.outputDir,
+                    removeParents: conf.inputDir,
+                    fields: 'id, parents'
+                  };
+                  drive.files.update(updateParams, (err, updated) => {
+                    if(err) {
+                      reject(err);
                       return;
                     }
-                    console.log(fileName + ': ' + result.items.length + ' rows, ' + sessionId + ' session' + ((sessionId != 1) ? 's' : ''));
-                    // fulfill(result);
-                    // fulfill('Indexed ' + totalRows + ' log rows in ' + res.length + ' files. Took ' + totalTime + ' ms.');
-                    var updateParams = {
-                      auth: oauth2Client,
-                      fileId: file.id,
-                      addParents: conf.outputDir,
-                      removeParents: conf.inputDir,
-                      fields: 'id, parents'
-                    };
-                    drive.files.update(updateParams, function(err, updated) {
-                      if(err) {
-                        reject(err);
-                        return;
-                      }
-                      else {
-                        console.log('Moved ' + file.name + ' from ' + conf.inputDir + ' to ' + conf.outputDir);
-                      }
-                    });
-                  }).catch(function(error) {
-                    reject(error);
-                    return;
+                    else {
+                      fulfill('Moved ' + file.name + ' from ' + conf.inputDir + ' to ' + conf.outputDir);
+                    }
                   });
                 }
                 else {
@@ -225,113 +237,27 @@ adapter.importData = function(c8, conf, opts) {
         }
       });
     }
-    else {
-      // use local file system
-      glob(conf.inputDir + "/*.csv", function (er, files) {
-        if (er) {
-          reject(er);
-          return;
-        }
-        let messages = [];
-        let fileNames = files.slice(0, MAX_FILES);
-        if(fileNames.length <= 0) {
-          fulfill('No logfiles found in ' + conf.inputDir);
-          return;
-        }
-        fileNames.forEach(function(fileName) {
-          results.push(indexCSV(fileName, fs.createReadStream, c8));
-          newFile = fileName.replace(conf.inputDir, conf.outputDir);
-          fs.rename(fileName, newFile, function(error) {
-            if (error) {
-              reject(error);
-            }
-            // console.log('Moved ' + fileName + ' to ' + newFile);
-          });
-        });
-        // console.log(JSON.stringify(results));
-        Promise.all(results).then(function(res) {
-          let totalRows = 0;
-          let totalTime = 0;
-          // console.log(JSON.stringify(res));
-          for (let i=0; i<res.length; i++) {
-            totalRows += res[i].items.length;
-            totalTime += res[i].took;
-          }
-          fulfill('Indexed ' + totalRows + ' log rows in ' + res.length + ' files. Took ' + totalTime + ' ms.');
-        }).catch(function(error) {
-          reject(error);
-        });
-      });
-    }
   });
 };
-
-function indexCSV(fileName, reader, c8) {
-  return new Promise(function (fulfill, reject){
-    let bulk = [];
-    let sessionId = 1;
-    reader(fileName).pipe(
-      parse(csvParserOpts)
-    ).on('data', function(parsed) {
-      let returned = prepareRow(parsed, fileName, sessionId);
-      let data = returned[0];
-      sessionId = returned[1];
-      if (data) {
-        bulk.push({index: {_index: c8._index, _type: c8._type, _id: data.timestamp}});
-        bulk.push(data);
-      }
-    }).on('error', function(error) {
-      // console.log(JSON.stringify(bulk));
-      reject(new Error('Error parsing file ' + fileName + ': ' + error));
-      return;
-    }).on('end', function() {
-      if (bulk.length > 0) {
-        // console.log(JSON.stringify(bulk, null, 1));
-        // return;
-        c8.bulk(bulk).then(function(response) {
-        let result = c8.trimBulkResults(response);
-          if (result.errors) {
-            let errors = [];
-            for (let x=0; x<result.items.length; x++) {
-              if (result.items[x].index.error) {
-                errors.push(x + ': ' + result.items[x].index.error.reason);
-              }
-            }
-            reject(new Error(fileName + ': ' + errors.length + ' errors in bulk insert:\n ' + errors.join('\n ')));
-            return;
-          }
-          console.log(fileName + ': ' + result.items.length + ' rows, ' + sessionId + ' session' + ((sessionId != 1) ? 's' : ''));
-          fulfill(result);
-        }).catch(function(error) {
-          // console.log(JSON.stringify(bulk));
-          reject(error);
-          return;
-        });
-      }
-      else {
-        fulfill('No data to import');
-      }
-    });
-  });
-}
 
 function prepareRow(data, fileName, sessionId) {
   if (!data) {
     throw(new Error('Empty data'));
     return false;
   }
+  const original = Object.assign({}, data);
   for (let prop in data) {
-   if (prop === '' || data[prop] == '-') {
-     // delete empty cells
-     delete data[prop];
+    if (prop === '' || data[prop] == '-') {
+      // delete empty cells
+      delete data[prop];
     }
     else if (prop && data[prop] == prop) {
       // extra headers indicate new session
       sessionId++;
-      return [null, sessionId];
+      return [{odb2: {session: sessionId}}];
     }
     else if (prop == 'GPS Time') {
-      var gpsTime = moment(data['GPS Time'].replace(/ GMT/, ''), 'ddd MMM dd HH:mm:ss ZZ YYYY');
+      var gpsTime = moment(data['GPS Time'].replace(/ GMT/, ''), 'ddd MMM DD HH:mm:ss ZZ YYYY');
       if (gpsTime.isValid()) {
         data[prop] = gpsTime.format();
       }
@@ -347,7 +273,7 @@ function prepareRow(data, fileName, sessionId) {
       }
       else {
         throw(new Error(data['Device Time'] + ' is not valid dateTime in ' + fileName + '!'));
-        return [null, sessionId];
+        return [{odb2: {session: sessionId}}];
       }
     }
     else {
@@ -359,12 +285,25 @@ function prepareRow(data, fileName, sessionId) {
       }
     }
   }
-  data.timestamp = data['Device Time'];
   data.session = fileName.replace(/^.*\//, '') + '-' + sessionId;
+  let ecsData = {
+    "@timestamp": data['Device Time'],
+    "ecs": {
+      "version": '1.0.1'
+    },
+    "event": {
+      "created": new Date(),
+      "dataset": "torque",
+      "module": "odb2",
+      "original": JSON.stringify(original),
+      "start": data['Device Time']
+    },
+    "odb2": data
+  };
   if (data['Latitude'] || data['Longitude']) {
-    data['coords'] = data['Latitude'] + ',' + data['Longitude'];
+    ecsData.geo = {location: data['Latitude'] + ',' + data['Longitude']};
   }
-  return [data, sessionId];
+  return ecsData;
 }
 
 module.exports = adapter;
