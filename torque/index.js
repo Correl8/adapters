@@ -1,7 +1,6 @@
+const {google} = require('googleapis');
 const fs = require('fs');
 const glob = require("glob");
-const google = require('googleapis');
-const googleAuth = require('google-auth-library');
 const moment = require('moment');
 const parse = require('csv-parse');
 const prompt = require('prompt');
@@ -11,7 +10,7 @@ const adapter = {};
 
 // default limit 1000 queries per user per 100 seconds
 // one file uses at least 1 get and 1 update
-const MAX_FILES = 10;
+const MAX_FILES = 1;
 
 const SCOPES = ['https://www.googleapis.com/auth/drive'];
 
@@ -85,7 +84,7 @@ adapter.storeConfig = async (c8, result) => {
       Object.assign(conf, JSON.parse(content));
       // console.log(conf);
       await c8.config(conf);
-      const auth = new googleAuth();
+      var auth = google.auth;
       const clientSecret = conf.installed.client_secret;
       const clientId = conf.installed.client_id;
       const redirectUrl = conf.installed.redirect_uris[0];
@@ -134,7 +133,7 @@ adapter.importData = (c8, conf, opts) => {
     if (conf.credentials) {
       // use Google Drive
       var drive = google.drive('v3');
-      var auth = new googleAuth();
+      var auth = google.auth;
       var clientSecret = conf.installed.client_secret;
       var clientId = conf.installed.client_id;
       var redirectUrl = conf.installed.redirect_uris[0];
@@ -148,12 +147,12 @@ adapter.importData = (c8, conf, opts) => {
         orderBy: 'modifiedTime desc',
         fields: "files(id, name, webContentLink)"
       }, (err, response) => {
-        // console.log(response.files);
+        // console.log(response.data.files);
         if (err) {
           reject(err);
           return;
         }
-        var files = response.files;
+        var files = response.data.files;
         if (files.length <= 0) {
           fulfill('No logs found in Drive folder ' + conf.inputDir);
         }
@@ -172,7 +171,9 @@ adapter.importData = (c8, conf, opts) => {
                 reject(error);
                 return;
               }
-              parse(content, csvParserOpts, async (err, parsed) => {
+              // console.log(content.data);
+              // process.exit();
+              parse(content.data, csvParserOpts, async (err, parsed) => {
                 let bulk = [];
                 if (err) {
                   reject(err);
