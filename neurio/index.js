@@ -1,4 +1,5 @@
-var neurio = require('neurio');
+const neurio = require('neurio');
+const moment = require('moment');
 
 var adapter = {};
 
@@ -16,65 +17,207 @@ adapter.sensorName = 'neurio';
 
 adapter.types = [
   {
-    name: 'neurio-appliances',
-    fields: {
-      appliance: {
-        label: 'string',
-        name: 'string',
-        locationId: 'string',
-        tags: 'string',
-        createdAt: 'date',
-        updatedAt: 'date',
-        id: 'string'
+    "name": 'neurio-appliances',
+    "fields": {
+      "@timestamp": "date",
+      "ecs": {
+        "version": 'keyword'
       },
-      status: 'string',
-      start: 'date',
-      end: 'date',
-      duration: 'integer',
-      energy: 'integer',
-      averagePower: 'integer',
-      guesses: {
-        heater: 'float',
-        air_conditioner: 'float',
-        toaster: 'float'
+      "event": {
+        "created": "date",
+        "dataset": "keyword",
+        "duration": "long",
+        "end": "date",
+        "module": "keyword",
+        "original": "keyword",
+        "start": "date",
+        // "timezone": "keyword"
       },
-      groupIds: 'string',
-      lastCycle: {
-        groupId: 'string',
-        start: 'date',
-        end: 'date',
-        energy: 'integer',
-        averagePower: 'integer',
-        createdAt: 'date',
-        updatedAt: 'date',
-        sensorId: 'string',
-        id: 'string'
+      "date_details": {
+        "year": 'long',
+        "month": {
+          "number": 'long',
+          "name": 'keyword',
+        },
+        "week_number": 'long',
+        "day_of_year": 'long',
+        "day_of_month": 'long',
+        "day_of_week": {
+          "number": 'long',
+          "name": 'keyword',
+        }
       },
-      cycleCount: 'integer',
-      isConfirmed: 'boolean',
-      id: 'string'
+      "time_slice": {
+        "start_hour": 'long',
+        "id": 'long',
+        "name": 'keyword',
+      },
+      "neurio": {
+        "appliance": {
+          "label": 'keyword',
+          "name": 'keyword',
+          "attributes": {
+            "autoDisagg": "boolean",
+            "autoTagged": "boolean",
+            "cycleTreshold": "long"
+          },
+          "locationId": 'keyword',
+          "tags": 'keyword',
+          "createdAt": 'date',
+          "updatedAt": 'date',
+          "id": 'keyword'
+        },
+        "status": 'keyword',
+        "energy": {
+          "consumption": 'long'
+        },
+        "averagePower": {
+          "consumption": 'long'
+        },
+        "guesses": {
+          "air_conditioner": 'float',
+          "dryer": 'float',
+          "electric_kettle": 'float',
+          "electric_vehicle": 'float',
+          "heater": 'float',
+          "microwave": 'float',
+          "oven": 'float',
+          "pool_pump": 'float',
+          "stove": 'float',
+          "toaster": 'float',
+          "water_heater": 'float'
+        },
+        "groupIds": 'keyword',
+        "lastCycle": {
+          "groupId": 'keyword',
+          "start": 'date',
+          "end": 'date',
+          "energy": {
+            "consumption": 'long'
+          },
+          "averagePower": {
+            "consumption": 'long'
+          },
+          "createdAt": 'date',
+          "updatedAt": 'date',
+          "sensorId": 'keyword',
+          "significant": 'boolean',
+          "id": 'keyword'
+        },
+        "cycleCount": 'long',
+        "isConfirmed": 'boolean',
+        "id": 'keyword',
+        "precedingEventId": "keyword"
+      },
     },
   },
   {
-    name: 'neurio-samples',
-    fields: {
-      timestamp: 'date',
-      cumulativeConsumptionEnergy: 'long',
-      consumptionEnergy: 'long',
-      consumptionPower: 'long',
-      generationEnergy: 'long',
-      generationPower: 'long'
+    "name": 'neurio-samples',
+    "fields": {
+      "@timestamp": "date",
+      "ecs": {
+        "version": 'keyword'
+      },
+      "event": {
+        "created": "date",
+        "dataset": "keyword",
+        "duration": "long",
+        "end": "date",
+        "module": "keyword",
+        "original": "keyword",
+        "start": "date",
+        // "timezone": "keyword"
+      },
+      "date_details": {
+        "year": 'long',
+        "month": {
+          "number": 'long',
+          "name": 'keyword',
+        },
+        "week_number": 'long',
+        "day_of_year": 'long',
+        "day_of_month": 'long',
+        "day_of_week": {
+          "number": 'long',
+          "name": 'keyword',
+        }
+      },
+      "time_slice": {
+        "start_hour": 'long',
+        "id": 'long',
+        "name": 'keyword',
+      },
+      "neurio": {
+        "energy": {
+          "consumption": 'long',
+          "cumulativeConsumption": 'long',
+          "generation": 'long',
+          "net": 'long',
+        },
+        "power": {
+          "consumption": 'long',
+          "generation": 'long',
+          "net": 'long',
+        },
+        "submeters": {
+          "power": "long",
+          "energy": "long",
+          "name": "keyword",
+          "channelNumber": "long"
+        }
+      }
     }
   },
   {
-    name: 'neurio-energy',
-    fields: {
-      timestamp: 'date',
-      start: 'date',
-      end: 'date',
-      duration: 'integer',
-      consumptionEnergy: 'long',
-      generationEnergy: 'long'
+    "name": 'neurio-energy',
+    "fields": {
+      "@timestamp": "date",
+      "ecs": {
+        "version": 'keyword'
+      },
+      "event": {
+        "created": "date",
+        "dataset": "keyword",
+        "duration": "long",
+        "end": "date",
+        "module": "keyword",
+        "original": "keyword",
+        "start": "date",
+        "timezone": "keyword"
+      },
+      "date_details": {
+        "year": 'long',
+        "month": {
+          "number": 'long',
+          "name": 'keyword',
+        },
+        "week_number": 'long',
+        "day_of_year": 'long',
+        "day_of_month": 'long',
+        "day_of_week": {
+          "number": 'long',
+          "name": 'keyword',
+        }
+      },
+      "time_slice": {
+        "start_hour": 'long',
+        "id": 'long',
+        "name": 'keyword',
+      },
+      "neurio": {
+        "energy": {
+          "consumption": 'long',
+          "cumulativeConsumption": 'long',
+          "generation": 'long',
+          "imported": 'long',
+          "exported": 'long',
+        },
+      },
+      "submeters": {
+        "energy": "long",
+        "name": "keyword",
+        "channelNumber": "long"
+      }
     }
   }
 ];
@@ -106,17 +249,17 @@ adapter.importData = function(c8, conf, opts) {
       client.user().then(function(user) {
         if (user && user.locations && user.locations.length) {
           c8.type(adapter.types[2].name).search({
-            _source: ['timestamp', 'cumulativeConsumptionEnergy'],
+            _source: ['@timestamp', 'cumulativeConsumptionEnergy'],
             size: 1,
-            sort: [{'timestamp': 'desc'}],
+            sort: [{'@timestamp': 'desc'}],
           }).then(function(response) {
             var resp = c8.trimResults(response);
             if (opts.firstDate) {
               firstDate = new Date(opts.firstDate);
               console.log('Setting first time to ' + firstDate);
             }
-            else if (resp && resp.timestamp) {
-              var d = new Date(resp.timestamp);
+            else if (resp && resp['@timestamp']) {
+              var d = new Date(resp['@timestamp']);
               lastConsumptionEnergy = resp.cumulativeConsumptionEnergy;
               firstDate = new Date(d.getTime() + 1);
               console.log('Setting first time to ' + firstDate);
@@ -145,9 +288,13 @@ adapter.importData = function(c8, conf, opts) {
             }
             for (var i=0; i<user.locations.length; i++) {
               var locId = user.locations[i].id;
+              // console.log(JSON.stringify(user.locations[i], null, 1));
               getAppliancePage(c8, client, locId, firstDate, lastDate, MIN_POWER, EVENTS_PER_PAGE, 1);
               for (var j=0; j<user.locations[i].sensors.length; j++) {
                 var sensorId = user.locations[i].sensors[j].id;
+                if (!sensorId) {
+                  continue;
+                }
                 getSamplesHistoryPage(c8, client, sensorId, firstDate, lastDate, GRANULARITY, FREQUENCY, EVENTS_PER_PAGE, 1);
                 getEnergyStats(c8, client, sensorId, firstDate, lastDate, GRANULARITY, FREQUENCY);
               }
@@ -167,6 +314,7 @@ adapter.importData = function(c8, conf, opts) {
 
 function getAppliancePage(c8, client, locId, firstDate, lastDate, minPower, perPage, page) {
   var applianceType = adapter.types[0].name;
+  // console.log(adapter.types[0].name);
   client.applianceEvents(locId, firstDate, lastDate, minPower, perPage, page).then(function(events) {
   // client.applianceEventsRecent(locId, firstDate).then(function(events) {
     // console.log(events);
@@ -176,18 +324,95 @@ function getAppliancePage(c8, client, locId, firstDate, lastDate, minPower, perP
     var bulk = [];
     for (var j=0; j<events.length; j++) {
       var values = events[j];
-      values.timestamp = new Date(values.start);
-      values.duration = (new Date(values.end).getTime() - new Date(values.start).getTime())/1000;
-      var logStr = values.timestamp.toISOString();
+      let st = new Date(values.start);
+      const start = moment(st.getTime());
+      let et = new Date(values.end);
+      var logStr = st.toISOString();
       if (values.appliance.label) {
         logStr += ' ' + values.appliance.label;
       }
-      console.log(logStr);
+      let startHour = st.getHours();
+      let startMinute = st.getMinutes();
+      let sliceName = [startHour, startMinute].join(':');
+      if ((startMinute == 0) || (startMinute == 5)) {
+        sliceName = [startHour, '0' + startMinute].join(':');
+      }
+      let idTime = startHour + startMinute/60;
+      let sliceId = Math.round((idTime + (idTime >= 4 ? -4 : 20)) * 12);
+      // console.log(logStr);
       var id = values.id;
-      bulk.push({index: {_index: c8.type(applianceType)._index, _type: c8.type(applianceType)._type, _id: id}});
-      bulk.push(values);
+      bulk.push({index: {_index: c8.type(applianceType)._index, _id: id}});
+      let data = {
+        "@timestamp": st,
+        "ecs": {
+          "version": '1.0.1'
+        },
+        "event": {
+          "created": new Date(),
+          "dataset": "neurio.appliances",
+          "duration": (et.getTime() - st.getTime()) * 1E6, // ms to ns
+          "end": et,
+          "module": "neurio",
+          "original": JSON.stringify(events[j]),
+          "start": st,
+        },
+        "date_details": {
+          "year": start.format('YYYY'),
+          "month": {
+            "number": start.format('M'),
+            "name": start.format('MMMM'),
+          },
+          "week_number": start.format('W'),
+          "day_of_year": start.format('DDD'),
+          "day_of_month": start.format('D'),
+          "day_of_week": {
+            "number": start.format('d'),
+            "name": start.format('dddd'),
+          }
+        },
+        "time_slice": {
+          "start_hour": startHour,
+          "id": sliceId,
+          "name": sliceName,
+        },
+        "neurio": {
+          "appliance": values.appliance,
+          "status": values.status,
+          "energy": {
+            "consumption": values.consumptionEnergy
+          },
+          "averagePower": {
+            "consumption": values.consumptionPower
+          },
+          "guesses": values.guesses,
+          "groupIds": values.groupIds,
+          "lastCycle": {
+            "groupId": values.lastCycle.groupId,
+            "start": values.lastCycle.start,
+            "end": values.lastCycle.end,
+            "energy": {
+              "consumption": values.lastCycle.consumptionEnergy
+            },
+            "averagePower": {
+              "consumption": values.lastCycle.consumptionPower
+            },
+            "createdAt": values.lastCycle.createdAt,
+            "updatedAt": values.lastCycle.updatedAt,
+            "sensorId": values.lastCycle.sensorId,
+            "significant": values.lastCycle.significant,
+            "id": values.lastCycle.id
+          },
+          "cycleCount": values.cycleCount,
+          "isConfirmed": values.isConfirmed,
+          "id": values.id,
+          "precedingEventId": values.precedingEventId
+        }
+      };
+      bulk.push(data);
     }
     if (bulk.length > 0) {
+      // console.log(bulk);
+      // process.exit();
       c8.type(applianceType).bulk(bulk).then(function(response) {
         let result = c8.trimBulkResults(response);
         if (result.errors) {
@@ -234,23 +459,75 @@ function getSamplesHistoryPage(c8, client, sensorId, start, end, granularity, fr
         values.cumulativeConsumptionEnergy = null;
         values.consumptionEnergy = null;
       }
-      values.cumulativeConsumptionEnergy = values.consumptionEnergy;
-      values.consumptionEnergy = values.consumptionEnergy - lastConsumptionEnergy;
+      let cumulativeConsumptionEnergy = values.consumptionEnergy;
+      let consumptionEnergy = values.consumptionEnergy - lastConsumptionEnergy;
       lastConsumptionEnergy = values.cumulativeConsumptionEnergy;
-      var power = values.consumptionPower || 0;
-      if (values.generationPower) {
-        power -= values.generationPower;
+      let st = new Date(values.timestamp);
+      const start = moment(st.getTime());
+      let et = new Date(st.getTime() + 5 * 60 * 1000); // 5 minute intervals
+      let startHour = st.getHours();
+      let startMinute = st.getMinutes();
+      let sliceName = [startHour, startMinute].join(':');
+      if ((startMinute == 0) || (startMinute == 5)) {
+        sliceName = [startHour, '0' + startMinute].join(':');
       }
-      var energy = values.consumptionEnergy || 0;
-      if (values.generationEnergy) {
-        power -= values.generationEnergy;
+      let idTime = startHour + startMinute/60;
+      let sliceId = Math.round((idTime + (idTime >= 4 ? -4 : 20)) * 12);
+      // var logStr = values.timestamp + ' ' + (values.netPower || values.consumptionPower) + ' W, ' + (values.netEnergy || values.consumptionEnergy) + ' Ws';
+      // console.log(logStr);
+      bulk.push({index: {_index: c8.type(sampleType)._index, _type: c8.type(sampleType)._type, _id: st}});
+      let data = {
+        "@timestamp": st,
+        "ecs": {
+          "version": '1.0.1'
+        },
+        "event": {
+          "created": new Date(),
+          "dataset": "neurio.history_samples",
+          "duration": (et.getTime() - st.getTime()) * 1E6, // ms to ns
+          "end": et,
+          "module": "neurio",
+          "original": JSON.stringify(events[i]),
+          "start": st,
+        },
+        "date_details": {
+          "year": start.format('YYYY'),
+          "month": {
+            "number": start.format('M'),
+            "name": start.format('MMMM'),
+          },
+          "week_number": start.format('W'),
+          "day_of_year": start.format('DDD'),
+          "day_of_month": start.format('D'),
+          "day_of_week": {
+            "number": start.format('d'),
+            "name": start.format('dddd'),
+          }
+        },
+        "time_slice": {
+          "start_hour": startHour,
+          "id": sliceId,
+          "name": sliceName,
+        },
+        "neurio": {
+          "energy": {
+            "consumption": values.consumptionEnergy || null,
+            "generation": values.generationEnergy || null,
+            "net": values.netEnergy || values.consumptionEnergy || null
+          },
+          "power": {
+            "consumption": values.consumptionPower || null,
+            "generation": values.generationPower || null,
+            "net": values.netPower || values.consumptionPower || null
+          },
+        }
+      };
+      if (values.submeters) {
+        data.neurio.submeters = values.submeters;
       }
-      var logStr = values.timestamp + ' ' + power + ' W, ' + energy + ' Ws';
-      console.log(logStr);
-      var id = values.timestamp;
-      bulk.push({index: {_index: c8.type(sampleType)._index, _type: c8.type(sampleType)._type, _id: id}});
-      bulk.push(values);
+      bulk.push(data);
       // console.log(values);
+      // console.log(data);
     }
     if (bulk.length > 0) {
       c8.type(sampleType).bulk(bulk).then(function(response) {
@@ -292,19 +569,72 @@ function getEnergyStats(c8, client, sensorId, start, end, granularity, frequency
     var bulk = [];
     for (var i=0; i<stats.length; i++) {
       var values = stats[i];
-      values.timestamp = new Date(values.start);
-      values.duration = (new Date(values.end).getTime() - new Date(values.start).getTime())/1000;
+      let st = new Date(values.start);
+      const start = moment(st.getTime());
+      let et = new Date(values.end);
       var consumption = values.consumptionEnergy || 0;
       if (values.generationEnergy) {
         consumption -= values.generationEnergy;
       }
       // console.log(values);
       // console.log(consumption);
-      var logStr = values.timestamp.toISOString() + ' ' + consumption + ' Ws';
-      console.log(logStr);
-      var id = values.timestamp;
-      bulk.push({index: {_index: c8.type(energyType)._index, _type: c8.type(energyType)._type, _id: id}});
-      bulk.push(values);
+      let startHour = st.getHours();
+      let startMinute = st.getMinutes();
+      let sliceName = [startHour, startMinute].join(':');
+      if ((startMinute == 0) || (startMinute == 5)) {
+        sliceName = [startHour, '0' + startMinute].join(':');
+      }
+      let idTime = startHour + startMinute/60;
+      let sliceId = Math.round((idTime + (idTime >= 4 ? -4 : 20)) * 12);
+      // var logStr = values.start + ' ' + consumption + ' Ws';
+      // console.log(logStr);
+      bulk.push({index: {_index: c8.type(energyType)._index, _type: c8.type(energyType)._type, _id: st}});
+      let data = {
+        "@timestamp": st,
+        "ecs": {
+          "version": '1.0.1'
+        },
+        "event": {
+          "created": new Date(),
+          "dataset": "neurio.energy_stats",
+          "duration": (et.getTime() - st.getTime()) * 1E6, // ms to ns
+          "end": et,
+          "module": "neurio",
+          "original": JSON.stringify(stats[i]),
+          "start": st,
+        },
+        "date_details": {
+          "year": start.format('YYYY'),
+          "month": {
+            "number": start.format('M'),
+            "name": start.format('MMMM'),
+          },
+          "week_number": start.format('W'),
+          "day_of_year": start.format('DDD'),
+          "day_of_month": start.format('D'),
+          "day_of_week": {
+            "number": start.format('d'),
+            "name": start.format('dddd'),
+          }
+        },
+        "time_slice": {
+          "start_hour": startHour,
+          "id": sliceId,
+          "name": sliceName,
+        },
+        "neurio": {
+          "energy": {
+            "consumption": values.consumptionEnergy || null,
+            "generation": values.generationEnergy || null,
+            "imported": values.importedEnergy || null,
+            "exported": values.exportedEnergy || null,
+          },
+        }
+      };
+      if (values.submeters) {
+        data.neurio.submeters = values.submeters;
+      }
+      bulk.push(data);
     }
     if (bulk.length > 0) {
       c8.type(energyType).bulk(bulk).then(function(response) {
@@ -331,6 +661,23 @@ function getEnergyStats(c8, client, sensorId, start, end, granularity, frequency
   }).catch(function(error) {
     console.trace(error);
   });
+}
+
+function time2slice(t) {
+  // creates a time_slice from a moment object
+  let time_slice = {};
+  let hour = t.format('H');
+  let minute = (5 * Math.floor(t.format('m') / 5 )) % 60;
+  time_slice.name = [hour, minute].join(':');
+  if (minute == 5) {
+    time_slice.name = [hour, '0' + minute].join(':');
+  }
+  else if (minute == 0) {
+    time_slice.name += '0';
+  }
+  let idTime = parseInt(hour) + parseInt(minute)/60;
+  time_slice.id = Math.round((idTime + (idTime >= 4 ? -4 : 20)) * 12);
+  return time_slice;
 }
 
 module.exports = adapter;
