@@ -38,11 +38,14 @@ adapter.types = [
         "dataset": "keyword",
         "duration": "long",
         "end": "date",
+        "ingested": "date",
+        "kind": "keyword",
         "module": "keyword",
         "original": "keyword",
         "start": "date",
         "timezone": "keyword"
       },
+      "message": 'text',
       "activity": {
         "dateString": 'keyword',
         "time": 'keyword',
@@ -55,7 +58,9 @@ adapter.types = [
         "actionUrl": 'keyword',
         "locations": 'keyword',
         "coords": 'geo_point',
-        "details": 'keyword',
+        "details": {
+          "name": 'keyword',
+        },
         "service": 'keyword'
       }
     }
@@ -232,6 +237,8 @@ adapter.importData = (c8, conf, opts) => {
           })
           .on('entry', (substream) => {
             fileActions = 0;
+            let jsonstream = StreamValues.withParser();
+            let bulk = [];
             eos(substream, (err) => {
               if (err) {
                 return console.log('stream had an error or closed early');
@@ -244,30 +251,34 @@ adapter.importData = (c8, conf, opts) => {
               console.log(new Error(error));
               // reject(error);
             })
-            .pipe(StreamValues.withParser())
+            .pipe(jsonstream)
             .on('error', (error) => {
               console.log('Error processing JSON stream in ' + substream.path);
               console.log(new Error(error));
               // reject(error);
             })
-            .on('data', (data) => {
+            .on('data', async (data) => {
               if (data.value && data.value.length) {
-                let bulk = [];
+                bulk = [];
                 for (var i=0; i<data.value.length; i++) {
                   let item = data.value[i];
                   if (item.time) {
                     let values = {
                       "@timestamp": item.time,
                       "ecs": {
-                        "version": "1.0.1"
+                        "version": "1.6.0"
                       },
                       "event": {
-                        "created": new Date(),
+                        "created": substream.mtime,
                         "dataset": "google.activity",
-                        "module": item.header,
+                        "ingested": new Date(),
+                        "kind": "event",
+                        "module": "Takeout",
                         "original": JSON.stringify(item),
+                        "provider": item.header,
                         "start":  item.time,
                       },
+                      "message": item.title,
                       "activity": item
                     };
                     let meta = {
@@ -280,26 +291,31 @@ adapter.importData = (c8, conf, opts) => {
                     fileActions++;
                     totalActions++;
                     if (bulk.length >= (MAX_BULK_BATCH * 2)) {
-                      driveStream.pause();
+                      jsonstream.pause();
                       let clone = bulk.slice(0);
                       bulk = [];
-                      results.push(indexBulk(clone, conf, c8).catch((error) => {reject(new Error(error));}));
-                      // console.log('Started ' + results.length + ' bulk batches (' + clone[1].@timestamp + ')');
+                      results.push(await indexBulk(clone, conf, c8).catch((error) => {reject(new Error(error));}));
+                      // console.log('Started ' + results.length + ' bulk batches (' + clone[1]['@timestamp'] + ')');
+                      jsonstream.resume();
                     }
                   }
-                }
-                if (bulk.length > 0) {
-                  // console.log(bulk);
-                  results.push(indexBulk(bulk, conf, c8).catch((error) => {reject(new Error(error));}));
-                  // console.log('Handled ' + substream.path + '. Started ' + results.length + ' bulk batches (' + bulk[1].@timestamp + ', last of ' + substream.path + ')');
                 }
                 console.log(substream.path + ': ' + fileActions + ' activities.');
               }
             })
-            .on('end', () => {
+            .on('end', async () => {
+              if (bulk.length > 0) {
+                // console.log(bulk);
+                results.push(await indexBulk(bulk, conf, c8).catch((error) => {reject(new Error(error));}));
+                // console.log('Handled ' + substream.path + '. Started ' + results.length + ' bulk batches (' + bulk[1]['@timestamp'] + ', last of ' + substream.path + ')');
+              }
             })
           })
           .on('finish', () => {
+            console.log('finish');
+          })
+          .on('end', () => {
+            console.log('end');
             if (totalActions > 0) {
               var updateParams = {
                 auth: oauth2Client,
@@ -330,8 +346,10 @@ adapter.importData = (c8, conf, opts) => {
 };
 
 function indexBulk(bulkData, oonf, c8) {
-  return new Promise((fulfill, reject) => {
-    c8.bulk(bulkData).then((result) => {
+  return new Promise(async (fulfill, reject) => {
+    try {
+      let response = await c8.bulk(bulkData);
+      let result = c8.trimBulkResults(response);
       if (result.errors) {
         if (result.items) {
           let errors = [];
@@ -343,14 +361,16 @@ function indexBulk(bulkData, oonf, c8) {
           reject(new Error(errors.length + ' errors in bulk insert:\n ' + errors.join('\n ')));
         }
         else {
-          reject(new Error(JSON.stringify(result.errors)));
+          reject(new Error(JSON.stringify(result.errors))); 
         }
       }
-      // console.log('Finished ' + (++finishedBatches) + ' bulk batches.');
-      driveStream.resume();
       // process.stdout.write('>');
+      // console.log('Finished ' + (++finishedBatches) + ' bulk batches. (' + result.items.length + ' items)');
       fulfill(result);
-    }).catch((error) => {reject(new Error(error));});
+    }
+    catch (e) {
+      reject(e);
+    }
   });
 }
 
