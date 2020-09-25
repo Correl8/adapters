@@ -1,60 +1,89 @@
 var request = require('request');
+var moment = require('moment');
 
-var MAX_DAYS = 100;
+var MAX_DAYS = 31;
 var MS_IN_DAY = 24 * 60 * 60 * 1000;
 var apiUrl;
-var acts = [
-  'Unspecified',
-  'Sleep',
-  'Eating',
-  'Other personal care',
-  'Main and second job',
-  'Employment activities',
-  'School and university',
-  'Homework',
-  'Freetime study',
-  'Food preparation',
-  'Dish washing',
-  'Cleaning dwelling',
-  'Other household upkeep',
-  'Laundry',
-  'Ironing',
-  'Handicraft',
-  'Gardening',
-  'Tending domestic animals',
-  'Caring for pets',
-  'Walking the dog',
-  'Construction and repairs',
-  'Shopping and services',
-  'Child care',
-  'Playing with and teaching kids',
-  'Other domestic work',
-  'Organisational work',
-  'Help to other households',
-  'Participatory activities',
-  'Visits and feasts',
-  'Other social life',
-  'Entertainment and culture',
-  'Resting',
-  'Walking and hiking',
-  'Sports and outdoors',
-  'Computer and video games',
-  'Other computing',
-  'Other hobbies and games',
-  'Reading books',
-  'Other reading',
-  'TV and video',
-  'Radio and music',
-  'Unspecified leisure',
-  'Travel to/from work',
-  'Travel related to study',
-  'Travel related to shopping',
-  'Transporting a child',
-  'Travel related to other domestic',
-  'Travel related to leisure',
-  'Unspecified travel',
-  'Unspecified'
-];
+var acts = {
+  "01": "Sleep",
+  "02": "Eating",
+  "03": "Other personal care",
+  "11": "Main job and second job",
+  "12": "Activities related to employment",
+  "21": "School and university",
+  "22": "Free time study",
+  "30": "Unspecified household and family care",
+  "31": "Food management",
+  "32": "Household upkeep",
+  "33": "Care for textiles",
+  "34": "Gardening and pet care",
+  "35": "Construction and repairs",
+  "36": "Shopping and services",
+  "37": "Household management",
+  "38": "Childcare",
+  "39": "Help to an adult household member",
+  "41": "Organisational work",
+  "42": "Informal help to other households",
+  "43": "Participatory and religious activities",
+  "51": "Social life",
+  "52": "Entertainment and culture",
+  "53": "Resting - time out",
+  "61": "Physical excercise",
+  "62": "Productive excercise",
+  "63": "Sports related activities",
+  "71": "Arts and hobbies",
+  "72": "Computing",
+  "73": "Games",
+  "81": "Reading",
+  "82": "TV, video and DVD",
+  "83": "Radio and recordings",
+  "91": "Travel to/from work",
+  "92": "Travel related to study",
+  "93": "Travel r. to shopping, services, childcare &amp;c.",
+  "94": "Travel related to voluntary work and meetings",
+  "95": "Travel related to social life",
+  "96": "Travel related to other leisure",
+  "98": "Travel related to changing locality",
+  "90": "Other or unspecified travel purpose",
+  "99": "Other unspecified time use",
+};
+var parents = {};
+for (var i in acts) {
+  let n = parseInt(i);
+  if (i < 10) {
+    parents[i] = "Personal care";
+  }
+  else if (i < 20) {
+    parents[i] = "Employment";
+  }
+  else if (i < 30) {
+    parents[i] = "Study";
+  }
+  else if (i < 40) {
+    parents[i] = "Household and family care";
+  }
+  else if (i < 50) {
+    parents[i] = "Voluntary work and meetings"; 
+  }
+  else if (i < 60) {
+    parents[i] = "Social life and entertainment"; 
+  }
+  else if (i < 70) {
+    parents[i] = "Sports and outdoor activities"; 
+  }
+  else if (i < 80) {
+    parents[i] = "Hobbies"; 
+  }
+  else if (i < 90) {
+    parents[i] = "Mass media"; 
+  }
+  else if (i < 99) {
+    parents[i] = "Travel by purpose"; 
+  }
+  else {
+    parents[i] = "Unspecified";
+  }
+}
 
 var locs = {
   '10': 'Unspecified',
@@ -75,31 +104,6 @@ var locs = {
   '31': 'Public transport'
 };
 
-var parents = [];
-for (var i=1; i<acts.length; i++) {
-  if (i <= 3) {
-    parents[i] = 'Personal care';
-  }
-  else if (i <= 5) {
-    parents[i] = 'Employment';
-  }
-  else if (i <= 8) {
-    parents[i] = 'Study';
-  }
-  else if (i <= 24) {
-    parents[i] = 'Domestic';
-  }
-  else if (i <= 41) {
-    parents[i] = 'Leisure';
-  }
-  else if (i <= 48) {
-    parents[i] = 'Travel';
-  }
-  else {
-    parents[i] = 'Unspecified';
-  }
-}
-
 var withValues = ['', 'alone', 'partner', 'parent', 'kids', 'family', 'others'];
 
 var adapter = {};
@@ -110,27 +114,64 @@ adapter.types = [
   {
     name: 'tracktime',
     fields: {
-      id: 'keyword',
-      timestamp: 'date',
-      starttime: 'date',
-      starthour: 'integer',
-      endtime: 'date',
-      sliceid: 'integer',
-      slice: 'keyword',
-      duration: 'integer',
-      mainid: 'integer',
-      mainaction: 'keyword',
-      maincategory: 'keyword',
-      sideid: 'integer',
-      sideaction: 'keyword',
-      sidecategory: 'keyword',
-      withid: 'integer',
-      with: 'keyword',
-      usecomputer: 'boolean',
-      where: 'keyword',
-      whereid: 'integer',
-      description: 'text',
-      rating: 'integer'
+      "@timestamp": "date",
+      "ecs": {
+        "version": "keyword"
+      },
+      "event": {
+        "created": "date",
+        "dataset": "keyword",
+        "duration": "long",
+        "end": "date",
+        "module": "keyword",
+        "original": "keyword",
+        "start": "date",
+        "timezone": "keyword"
+      },
+      "date_details": {
+        "year": 'long',
+        "month": {
+          "number": 'long',
+          "name": 'keyword',
+        },
+        "week_number": 'long',
+        "day_of_year": 'long',
+        "day_of_month": 'long',
+        "day_of_week": {
+          "number": 'long',
+          "name": 'keyword',
+        }
+      },
+      "time_slice": {
+        "start_hour": 'integer',
+        "id": 'integer',
+        "name": 'keyword',
+      },
+      "hetus": {
+        "activity": {
+          "main": {
+            "id": "long",
+            "name": "keyword",
+            "category": "keyword"
+          },
+          "side": {
+            "id": "long",
+            "name": "keyword",
+            "category": "keyword"
+          },
+        },
+        "with_whom": {
+          "id": 'long',
+          "name": 'keyword',
+        },
+        "location": {
+          "id": 'long',
+          "name": 'keyword',
+        },
+        "use_computer": 'boolean',
+        // "description": 'text',
+        // "rating": "long"
+      },
     }
   }
 ];
@@ -153,17 +194,17 @@ adapter.storeConfig = function(c8, result) {
 adapter.importData = function(c8, conf, opts) {
   return new Promise(function (fulfill, reject){
     c8.search({
-      _source: ['timestamp'],
+      _source: ['@timestamp'],
       size: 1,
-      sort: [{'timestamp': 'desc'}],
+      sort: [{'@timestamp': 'desc'}],
     }).then(function(response) {
       var resp = c8.trimResults(response);
       if (opts.firstDate) {
         firstDate = new Date(opts.firstDate);
         console.log('Setting first time to ' + firstDate);
       }
-      else if (resp && resp.timestamp) {
-        var d = new Date(resp.timestamp);
+      else if (resp && resp['@timestamp']) {
+        var d = new Date(resp['@timestamp']);
         firstDate = new Date(d.getTime() + 1);
         console.log('Setting first time to ' + firstDate);
       }
@@ -185,6 +226,10 @@ adapter.importData = function(c8, conf, opts) {
       var url = conf.url + '?starttime=' + Math.floor(firstDate/1000);
       if (lastDate) {
         console.log("Setting last time to " + lastDate);
+        if (lastDate < firstDate) {
+          console.error('ERROR: end time ' + lastDate + ' before start time ' + firstDate + '!');
+          process.exit(-1);
+        }
         url += '&endtime=' + Math.ceil(lastDate/1000);
       }
       var cookieJar = request.jar();
@@ -194,63 +239,111 @@ adapter.importData = function(c8, conf, opts) {
           // console.warn('Error getting data: ' + JSON.stringify(response.body));
         }
         // console.log(body);
-        var data = JSON.parse(body);
-        if (data && data.length) {
+        var times = JSON.parse(body);
+        if (times && times.length) {
           var bulk = [];
-          for (var i=data.length-1; i>=0; i--) {
-            // bulk.push({index: {_index: c8._index, _type: c8._type, _id: data[i].id}});
-            data[i].starttime = new Date(data[i].starttime);
-            data[i].endtime = new Date(data[i].endtime);
-            data[i].duration = (data[i].endtime - data[i].starttime)/1000;
-            data[i].timestamp = data[i].starttime;
-            data[i].mainid = data[i].mainaction;
-            data[i].mainaction = acts[data[i].mainaction];
-            data[i].maincategory = parents[data[i].mainid];
-            data[i].sideid = data[i].sideaction;
-            data[i].sideaction = acts[data[i].sideaction];
-            data[i].sidecategory = parents[data[i].sideid];
-            data[i].usecomputer = data[i].usecomputer ? true : false;
-            data[i].whereid = data[i].location;
-            data[i].where = locs[data[i].location];
-            delete(data[i].location);
-            data[i].withid = data[i]['with'];
-            if (data[i] == 1) {
-              data[i].withid = ['alone'];
+          for (var i=times.length-1; i>=0; i--) {
+            let entry = times[i];
+            let st = moment(entry.starttime);
+            let et = moment(entry.endtime);
+            let withId = entry['with'];
+            let withArray = [];
+            if (withId == 1) {
+              withArray = ['alone'];
             }
             else {
-              data[i]['with'] = [];
               for (var j=0; j<=6; j++) {
-                if (data[i].withid & Math.pow(2, (j-1))) {
-                  data[i]['with'].push(withValues[j].toLowerCase());
+                if (withId & Math.pow(2, (j-1))) {
+                  withArray.push(withValues[j].toLowerCase());
                 }
               }
             }
-            // split into 10 minute slices
-            var tenMinutes = 10 * 60 * 1000;
-            var start = data[i].starttime.getTime();
-            var end = data[i].endtime.getTime();
-            for (var t = start; t < end; t += tenMinutes) {
-              var copy = JSON.parse(JSON.stringify(data[i]));
-              // var id = t + '-' + data[i].id;
-              var sliceTime = new Date(t);
-              var startHour = sliceTime.getHours();
-              var startMinute = sliceTime.getMinutes();
-              copy.slice = [startHour, startMinute].join(':');
-              if (startMinute == 0) {
-                copy.slice += '0';
+            let data = {
+              "@timestamp": st.format(),
+              "ecs": {
+                "version": "1.0.1"
+              },
+              "event": {
+                "created": new Date(),
+                "dataset": "tracktime.hetus",
+                "duration": moment.duration(et.diff(st)).as('ms') * 1E6, // ms to ns
+                "end": et.format(),
+                "module": "tracktime",
+                "original": JSON.stringify(entry),
+                "start": st.format(),
+              },
+              "date_details": {
+              },
+              "time_slice": {
+              },
+              "hetus": {
+                "activity": {
+                  "main": {
+                    "id": entry.mainaction,
+                    "name": acts[entry.mainaction],
+                    "category": parents[entry.mainaction]
+                  },
+                  "side": {
+                    "id": entry.sideaction,
+                    "name": acts[entry.sideaction],
+                    "category": parents[entry.sideaction]
+                  },
+                },
+                "with_whom": {
+                  "id": withId,
+                  "name": withArray
+                },
+                "location": {
+                  "id": entry.location,
+                  "name": locs[entry.location],
+                },
+                "use_computer": entry.usecomputer = entry.usecomputer ? true : false,
+                // "description": entry.description,
+                // "rating": entry.rating
               }
-              var idTime = startHour + startMinute/60;
-              copy.sliceid = Math.round((idTime + (idTime >= 4 ? -4 : 20)) * 6);
-              copy.timestamp = t;
-              copy.starttime = t;
-              copy.starthour = startHour;
-              copy.endtime = t + tenMinutes;
-              copy.duration = tenMinutes / 1000;
-              bulk.push({index: {_index: c8._index, _type: c8._type, _id: t}});
+            };
+            
+            // split into 5 minute slices
+            var fiveMinutesInNanos = 5 * 60 * 1000 * 1E6;
+            var t = st;
+            while (t.valueOf() < et.valueOf()) {
+              var copy = JSON.parse(JSON.stringify(data));
+              copy.date_details = {
+                "year": t.format('YYYY'),
+                "month": {
+                  "number": t.format('M'),
+                  "name": t.format('MMMM'),
+                },
+                "week_number": t.format('W'),
+                "day_of_year": t.format('DDD'),
+                "day_of_month": t.format('D'),
+                "day_of_week": {
+                  "number": t.format('d'),
+                  "name": t.format('dddd'),
+                }
+              }
+              var startHour = t.format('H');
+              var startMinute = t.format('m');
+              copy.time_slice.name = [startHour, startMinute].join(':');
+              if (startMinute == 5) {
+                copy.time_slice.name = [startHour, '0' + startMinute].join(':');
+              }
+              else if (startMinute == 0) {
+                copy.time_slice.name += '0';
+              }
+              var idTime = parseInt(startHour) + parseInt(startMinute)/60;
+              copy.time_slice.id = Math.round((idTime + (idTime >= 4 ? -4 : 20)) * 12);
+              copy['@timestamp'] = t.format();
+              copy.event.start = t.format();
+              copy.time_slice.start_hour = startHour;
+              // the start of next interval is the end of current one
+              t.add(5, 'minutes');
+              copy.event.end = t.format();
+              copy.event.duration = fiveMinutesInNanos;
+              bulk.push({index: {_index: c8._index, _type: c8._type, _id: t.valueOf()}});
               bulk.push(copy);
-              // console.log(JSON.stringify(copy.sliceId) + ': ' + sliceTime);
             }
-            // console.log(data[i].timestamp);
+            // console.log(entry['@timestamp']);
           }
           if (bulk.length > 0) {
             c8.bulk(bulk).then(function(response) {
