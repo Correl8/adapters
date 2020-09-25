@@ -4,8 +4,8 @@
   "description": "Import data from Spire.io API into Correl8.me",
   "main": "index.js",
   "dependencies": {
-    "correl8-cli": "^0.1.0",
-    "spire-tracker": "^0.2.0"
+    "correl8-cli": "latest",
+    "spire-tracker": "latest"
   },
   "devDependencies": {},
   "scripts": {
