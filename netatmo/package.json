@@ -1,0 +1,20 @@
+{
+  "name": "correl8-adapter-netatmo",
+  "version": "1.0.0",
+  "description": "Import data from Netatmo to Correl8.me",
+  "main": "index.js",
+  "dependencies": {
+    "client-oauth2": "latest",
+    "correl8-cli": "latest",
+    "express": "latest",
+    "moment": "latest",
+    "netatmo": "latest",
+    "uuid": "latest"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "start": "node node_modules/correl8-cli/app.js -a ../../index.js"
+  },
+  "author": "Samuel Rinnetmäki <samuel@iki.fi>",
+  "license": "ISC"
+}
