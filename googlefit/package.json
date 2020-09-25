@@ -4,11 +4,11 @@
   "description": "Import data from Google Fit API into Correl8.me",
   "main": "index.js",
   "dependencies": {
-    "correl8-cli": "^0.1.0",
-    "google-fit-activity-types": "^0.1.0",
-    "googleapis": "^19.0.0",
-    "path": "^0.12.7",
-    "prompt": "^1.0.0"
+    "correl8-cli": "latest",
+    "google-fit-activity-types": "latest",
+    "googleapis": "latest",
+    "path": "latest",
+    "prompt": "latest"
   },
   "devDependencies": {},
   "scripts": {
