@@ -4,9 +4,9 @@
   "description": "Import data from Tracktime into Correl8.me",
   "main": "index.js",
   "dependencies": {
-    "correl8-cli": "^0.1.1",
-    "moment": "^2.24.0",
-    "request": "^2.88.0"
+    "correl8-cli": "latest",
+    "moment": "latest",
+    "request": "latest"
   },
   "devDependencies": {},
   "scripts": {
