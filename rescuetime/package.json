@@ -4,8 +4,8 @@
   "description": "Import data from RescueTime into Correl8.me",
   "main": "index.js",
   "dependencies": {
-    "correl8-cli": "^0.1.0",
-    "request": "^2.74.0"
+    "correl8-cli": "latest",
+    "request": "latest"
   },
   "devDependencies": {},
   "scripts": {
