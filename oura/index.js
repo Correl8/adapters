@@ -568,15 +568,18 @@ function getSleep(c8, client, start, end) {
       let data = {
         "@timestamp": moment(sleep.bedtime_end),
         "ecs": {
-          "version": "1.0.1"
+          "version": "1.6.0"
         },
         "event": {
-          "created": new Date(),
+          "created": moment(sleep.bedtime_end).format(),
           "dataset": "oura.sleep",
           "duration": sleep.duration * 1E9,
           "end": moment(sleep.bedtime_end).format(),
+          "ingested": new Date(),
+          "kind": "event",
           "module": "oura",
           "original": JSON.stringify(sleep),
+          "sequence": sleep.period_id,
           "start": t.format(),
           "timezone": mins2ts(sleep.timezone)
         },
@@ -646,14 +649,14 @@ function getSleep(c8, client, start, end) {
           // console.log('Found ' + j + ': ' + d.format());
           if ((sleepHRData[j] == 0) || (sleepHRData[j] == 255)) {
             // ignore value, it's likely faulty
-            d.add(5, 'minutes');
+            d.add(duration, 'seconds');
             // console.log('Skipping ' + d.format());
             continue;
           }
           let data = {
             "@timestamp": d.format(),
             "ecs": {
-              "version": "1.0.1"
+              "version": "1.6.0"
             },
             "date_details": {
               "year": d.format('YYYY'),
@@ -671,13 +674,16 @@ function getSleep(c8, client, start, end) {
             },
             "time_slice": time2slice(d),
             "event": {
-              "created": new Date(),
+              "created": moment(sleep.bedtime_end).format(),
               "dataset": "oura.sleep",
-              "duration": 5 * 60 * 1E9,
+              "duration": duration * 1E9,
+              "ingested": new Date(),
+              "kind": "metric",
               "module": "oura",
               "original": sleepHRData[j],
+              "sequence": j,
               "start": d.format(),
-              "end": d.add(5, 'minutes').format(),
+              "end": d.add(duration, 'seconds').format(),
             },
             "sleep": {
               "hr": sleepHRData[j]
@@ -693,13 +699,13 @@ function getSleep(c8, client, start, end) {
         for (var j=0; j<sleepHRVData.length; j++) {
           if ((sleepHRVData[j] == 0) || (sleepHRVData[j] == 255)) {
             // ignore value, it's likely faulty
-            d.add(5, 'minutes');
+            d.add(duration, 'seconds');
             continue;
           }
           let data = {
             "@timestamp": d.format(),
             "ecs": {
-              "version": "1.0.1"
+              "version": "1.6.0"
             },
             "date_details": {
               "year": d.format('YYYY'),
@@ -717,13 +723,16 @@ function getSleep(c8, client, start, end) {
             },
             "time_slice": time2slice(d),
             "event": {
-              "created": new Date(),
+              "created": moment(sleep.bedtime_end).format(),
               "dataset": "oura.sleep",
-              "duration": 5 * 60 * 1E9,
+              "duration": duration * 1E9,
+              "ingested": new Date(),
+              "kind": "metric",
               "module": "oura",
               "original": sleepHRVData[j],
+              "sequence": j,
               "start": d.format(),
-              "end": d.add(5, 'minutes').format(),
+              "end": d.add(duration, 'seconds').format(),
             },
             "sleep": {
               "hrv": {
@@ -742,7 +751,7 @@ function getSleep(c8, client, start, end) {
           let data = {
             "@timestamp": d.format(),
             "ecs": {
-              "version": "1.0.1"
+              "version": "1.6.0"
             },
             "date_details": {
               "year": d.format('YYYY'),
@@ -760,13 +769,17 @@ function getSleep(c8, client, start, end) {
             },
             "time_slice": time2slice(d),
             "event": {
-              "created": new Date(),
+              "created": moment(sleep.bedtime_end).format(),
               "dataset": "oura.sleep",
-              "duration": 5 * 60 * 1E9,
+              "duration": duration * 1E9,
+              "ingested": new Date(),
+              "kind": "metric",
               "module": "oura",
+              "original": sleepHRVData[j],
+              "sequence": j,
               "original": sleepStateData[j],
               "start": d.format(),
-              "end": d.add(5, 'minutes').format(),
+              "end": d.add(duration, 'seconds').format(),
             },
             "sleep": {
               "state": {
@@ -823,15 +836,18 @@ function getActivity(c8, client, start, end) {
       let data = {
         "@timestamp": moment(activity.summary_date),
         "ecs": {
-          "version": "1.0.1"
+          "version": "1.6.0"
         },
         "event": {
-          "created": new Date(),
+          "created": endMoment.format(),
           "dataset": "oura.activity",
           "duration": endMoment.diff(startMoment) * 1E6, // moment diff is milliseconds, want nanos
           "end": endMoment.format(),
+          "ingested": new Date(),
+          "kind": "event",
           "module": "oura",
           "original": JSON.stringify(activity),
+          "sequence": activity.period_id,
           "start": startMoment.format(),
           "timezone": mins2ts(activity.timezone)
         },
@@ -853,8 +869,8 @@ function getActivity(c8, client, start, end) {
           "summary_date": activity.summary_date,
           "period_id": activity.period_id,
           "timezone": activity.timezone,
-          "day_start": startMoment,
-          "day_end": endMoment,
+          "day_start": startMoment.format(),
+          "day_end": endMoment.format(),
           "score": {
             "value": activity.score,
             "stay_active": activity.score_stay_active,
@@ -901,7 +917,7 @@ function getActivity(c8, client, start, end) {
           let data = {
             "@timestamp": d.format(),
             "ecs": {
-              "version": "1.0.1"
+              "version": "1.6.0"
             },
             "date_details": {
               "year": d.format('YYYY'),
@@ -919,13 +935,16 @@ function getActivity(c8, client, start, end) {
             },
             "time_slice": time2slice(d),
             "event": {
-              "created": new Date(),
+              "created": endMoment.format(),
               "dataset": "oura.activity",
-              "duration": 1 * 60 * 1E9,
+              "duration": duration * 1E9,
+              "ingested": new Date(),
+              "kind": "metric",
               "module": "oura",
               "original": activityMETData[j],
+              "sequence": j,
               "start": d.format(),
-              "end": d.add(1, 'minutes').format(),
+              "end": d.add(duration, 'seconds').format(),
             },
             "activity": {
               "met": {
@@ -944,7 +963,7 @@ function getActivity(c8, client, start, end) {
           let data = {
             "@timestamp": d.format(),
             "ecs": {
-              "version": "1.0.1"
+              "version": "1.6.0"
             },
             "date_details": {
               "year": d.format('YYYY'),
@@ -962,13 +981,16 @@ function getActivity(c8, client, start, end) {
             },
             "time_slice": time2slice(d),
             "event": {
-              "created": new Date(),
+              "created": endMoment.format(),
               "dataset": "oura.activity",
-              "duration": 5 * 60 * 1E9,
+              "duration": duration * 1E9,
+              "ingested": new Date(),
+              "kind": "metric",
               "module": "oura",
               "original": activityClassData[j],
+              "sequence": j,
               "start": d.format(),
-              "end": d.add(5, 'minutes').format(),
+              "end": d.add(duration, 'seconds').format(),
             },
             "activity": {
               "class": {
@@ -1021,13 +1043,16 @@ function getReadiness(c8, client, start, end) {
       let data = {
         "@timestamp": moment(readiness.summary_date).hour(4).add(1, 'days'),
         "ecs": {
-          "version": "1.0.1"
+          "version": "1.6.0"
         },
         "event": {
-          "created": new Date(),
+          "created": endMoment.format(),
           "dataset": "oura.readiness",
+          "ingested": new Date(),
+          "kind": "event",
           "module": "oura",
           "original": JSON.stringify(readiness),
+          "sequence": readiness.period_id,
           "start": startMoment,
           "end": endMoment,
         },
@@ -1060,10 +1085,10 @@ function getReadiness(c8, client, start, end) {
           },
         },
       };
-      console.log(readiness.summary_date + ': readiness score ' + readiness.score);
       let id = readiness.summary_date + '.' + readiness.period_id;
       bulk.push({index: {_index: c8.type(readinessSummaryIndex)._index, _id: id}});
       bulk.push(data);
+      console.log(id + ' (' + readiness.period_id + '): readiness score ' + readiness.score);
     }
     if (bulk.length > 0) {
       try {
