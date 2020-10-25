@@ -184,9 +184,6 @@ adapter.types = [
         },
       },
       "place_visit": {
-        "geo": {
-          "location": "geo_point"
-        },
         "accuracyMetres": 'integer',
         "placeId": 'keyword',
         "address": 'keyword',
@@ -211,6 +208,11 @@ adapter.types = [
           "locationConfidence": 'float',
         },
         "editConfirmationStatus": 'keyword',
+      },
+      "position": {
+        "geo": {
+          "location": "geo_point"
+        },
       },
     },
   },
@@ -252,7 +254,7 @@ adapter.types = [
         "id": 'long',
         "name": 'keyword',
       },
-      "points": {
+      "position": {
         "geo": {
           "location": "geo_point"
         },
@@ -298,7 +300,7 @@ adapter.types = [
         "id": 'long',
         "name": 'keyword',
       },
-      "parking_event": {
+      "position": {
         "geo": {
           "location": "geo_point"
         },
@@ -581,6 +583,11 @@ adapter.importData = function(c8, conf, opts) {
                   values.activity_segment.start.geo = {
                     "location": sl.latitudeE7/1E7+','+sl.longitudeE7/1E7,
                   };
+                  values.position = {
+                    "geo": {
+                      "location": sl.latitudeE7/1E7+','+sl.longitudeE7/1E7
+                    }
+                  };
                 }
                 if (el.latitudeE7) {
                   values.activity_segment.end.geo = {
@@ -609,7 +616,7 @@ adapter.importData = function(c8, conf, opts) {
                   },
                   "time_slice": time2slice(start),
                   "time_details": time2details(start),
-                  "parking": {
+                  "position": {
                     "geo": {
                       "location": el.latitudeE7/1E7+','+el.longitudeE7/1E7,
                     },
@@ -627,6 +634,7 @@ adapter.importData = function(c8, conf, opts) {
                 await checkBulk(bulk, substream.path, c8, parse);
               }
               if (pv) {
+                let p = false;
                 let s = Number(pv.duration.startTimestampMs);
                 let e = Number(pv.duration.endTimestampMs);
                 let start = moment(s);
@@ -634,8 +642,10 @@ adapter.importData = function(c8, conf, opts) {
                 let duration = (e - s) * 1E6;
                 let l = pv.location;
                 if (l.latitudeE7) {
-                  l.geo = {
-                    "location": l.latitudeE7/1E7+','+l.longitudeE7/1E7,
+                  p = {
+                    "geo": {
+                      "location": l.latitudeE7/1E7+','+l.longitudeE7/1E7
+                    }
                   };
                   delete(l.latitudeE7);
                   delete(l.longitudeE7);
@@ -645,7 +655,7 @@ adapter.importData = function(c8, conf, opts) {
                 if (pv.centerLatE7) {
                   l.center = {
                     "geo": {
-                      "location": pv.centerLatE7/1E7+','+pv.centerLngE7/1E7,
+                      "location": pv.centerLatE7/1E7+','+pv.centerLngE7/1E7
                     },
                   }
                 }
@@ -663,6 +673,9 @@ adapter.importData = function(c8, conf, opts) {
                   "date_details": time2details(start),
                   "place_visit": l
                 });
+                if (p) {
+                  values.position = p;
+                }
                 let meta = {
                   index: {
                     _index: c8.type(adapter.types[2].name)._index,
