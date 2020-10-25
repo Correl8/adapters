@@ -25,6 +25,8 @@ adapter.types = [
         "dataset": "keyword",
         "duration": "long",
         "end": "date",
+        "ingested": "date",
+        "kind": "keyword",
         "module": "keyword",
         "original": "keyword",
         "start": "date",
@@ -320,6 +322,7 @@ adapter.importData = (c8, conf, opts) => {
               let event = events[j];
               const start = moment(event.start.dateTime || event.start.date);
               const end = moment(event.end.dateTime || event.end.date);
+              const created = moment(event.created).format();
               event.calendar = cal;
               event.analyzedSummary = event.summary; // will be treated as full text, not string
               event.calendarId = calId;
@@ -329,11 +332,13 @@ adapter.importData = (c8, conf, opts) => {
               let data = {
                 "@timestamp": start,
                 "ecs": {
-                  "version": "1.0.1"
+                  "version": "1.6.0"
                 },
                 "event": {
-                  "created": new Date(),
+                  "created": created,
                   "dataset": "google.calendar",
+                  "ingested": new Date(),
+                  "kind": "event",
                   "module": cal,
                   "original": JSON.stringify(events[j]),
                   "start":  start.format(),
