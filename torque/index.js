@@ -38,9 +38,13 @@ adapter.types = [
       "event": {
         "created": "date",
         "dataset": "keyword",
+        "ingested": "date",
+        "kind": "keyword",
         "module": "keyword",
         "original": "keyword",
+        "provider": "keyword",
         "start": "date",
+        "sequence": "long",
       },
       "geo": {
         "location": "geo_point"
@@ -145,7 +149,7 @@ adapter.importData = (c8, conf, opts) => {
         q: "'" + conf.inputDir + "' in parents and trashed != true and (mimeType='text/csv' or mimeType='text/comma-separated-values')",
         pageSize: MAX_FILES,
         orderBy: 'modifiedTime desc',
-        fields: "files(id, name, webContentLink)"
+        fields: "files(id, name, createdTime, webContentLink)"
       }, (err, response) => {
         // console.log(response.data.files);
         if (err) {
@@ -161,6 +165,7 @@ adapter.importData = (c8, conf, opts) => {
           for (let i = 0; i < files.length; i++) {
             const file = files[i];
             const fileName = file.name;
+            const cTime = file.createdTime;
             const opts = {
               auth: oauth2Client,
               fileId: file.id,
@@ -186,6 +191,8 @@ adapter.importData = (c8, conf, opts) => {
                   // console.log(returned);
                   data = returned;
                   if (data && data.odb2 && data.odb2.session) {
+                    data.event.created = moment(cTime).format();
+                    data.event.sequence = i;
                     sessionId = data.odb2.session.replace(/^.*-(\d+)$/, '$1');
                     if (data.ecs) {
                       bulk.push({index: {_index: c8._index, _id: data["@timestamp"]}});
@@ -290,13 +297,15 @@ function prepareRow(data, fileName, sessionId) {
   let ecsData = {
     "@timestamp": data['Device Time'],
     "ecs": {
-      "version": '1.0.1'
+      "version": '1.6.0'
     },
     "event": {
-      "created": new Date(),
       "dataset": "torque",
-      "module": "odb2",
+      "ingested": new Date(),
+      "kind": "metric",
+      "module": "drivesync",
       "original": JSON.stringify(original),
+      "provider": "ODB2",
       "start": data['Device Time']
     },
     "odb2": data
