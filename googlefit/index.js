@@ -39,12 +39,34 @@ adapter.types = [
         "start": "date",
         "timezone": "keyword"
       },
+      "date_details": {
+        "year": 'long',
+        "month": {
+          "number": 'long',
+          "name": 'keyword',
+        },
+        "week_number": 'long',
+        "day_of_year": 'long',
+        "day_of_month": 'long',
+        "day_of_week": {
+          "number": 'long',
+          "name": 'keyword',
+        }
+      },
+      "time_slice": {
+        "start_hour": 'long',
+        "id": 'long',
+        "name": 'keyword',
+      },
       "message": 'text',
       "fit": {
         'accuracy': 'float',
         'activityId': 'integer',
         'activity': 'keyword',
         'altitude': 'float',
+        "application": {
+          "packageName": 'keyword',
+        },
         'bpm': 'float',
         'calories': 'float',
         'confidence': 'float',
@@ -388,4 +410,5 @@ function time2slice(t) {
   time_slice.id = Math.round((idTime + (idTime >= 4 ? -4 : 20)) * 12);
   return time_slice;
 }
+
 module.exports = adapter;
