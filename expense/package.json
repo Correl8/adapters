@@ -4,8 +4,9 @@
   "description": "Import data from Expense into Correl8.me",
   "main": "index.js",
   "dependencies": {
-    "correl8-cli": "^0.1.0",
-    "request": "^2.83.0"
+    "correl8-cli": "latest",
+    "fetch-cookie": "latest",
+    "node-fetch": "latest"
   },
   "scripts": {
     "start": "node node_modules/correl8-cli/app.js -a ../../index.js"
