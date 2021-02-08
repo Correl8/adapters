@@ -46,8 +46,29 @@ adapter.types = [
         "start": "date",
         "sequence": "long",
       },
-      "geo": {
-        "location": "geo_point"
+      "date_details": {
+        "year": 'long',
+        "month": {
+          "number": 'long',
+          "name": 'keyword',
+        },
+        "week_number": 'long',
+        "day_of_year": 'long',
+        "day_of_month": 'long',
+        "day_of_week": {
+          "number": 'long',
+          "name": 'keyword',
+        }
+      },
+      "time_slice": {
+        "start_hour": 'long',
+        "id": 'long',
+        "name": 'keyword',
+      },
+      "position": {
+        "geo": {
+          "location": "geo_point"
+        },
       },
       "odb2": {
         "timestamp": "date",
@@ -276,10 +297,7 @@ function prepareRow(data, fileName, sessionId) {
     }
     else if (prop == 'Device Time') {
       var deviceTime = moment(data['Device Time'], 'DD-MMM-YYYY HH:mm:ss.SSS');
-      if (deviceTime.isValid()) {
-        data['Device Time'] = deviceTime.valueOf();
-      }
-      else {
+      if (! deviceTime.isValid()) {
         throw(new Error(data['Device Time'] + ' is not valid dateTime in ' + fileName + '!'));
         return [{odb2: {session: sessionId}}];
       }
@@ -294,6 +312,7 @@ function prepareRow(data, fileName, sessionId) {
     }
   }
   data.session = fileName.replace(/^.*\//, '') + '-' + sessionId;
+  data['Device Time'] = deviceTime.valueOf();
   let ecsData = {
     "@timestamp": data['Device Time'],
     "ecs": {
@@ -308,12 +327,44 @@ function prepareRow(data, fileName, sessionId) {
       "provider": "ODB2",
       "start": data['Device Time']
     },
+    "time_slice": time2slice(deviceTime),
+    "date_details": {
+      "year": deviceTime.format('YYYY'),
+      "month": {
+        "number": deviceTime.format('M'),
+        "name": deviceTime.format('MMMM'),
+      },
+      "week_number": deviceTime.format('W'),
+      "day_of_year": deviceTime.format('DDD'),
+      "day_of_month": deviceTime.format('D'),
+      "day_of_week": {
+        "number": deviceTime.format('d'),
+        "name": deviceTime.format('dddd'),
+      }
+    },
     "odb2": data
   };
   if (data['Latitude'] || data['Longitude']) {
     ecsData.geo = {location: data['Latitude'] + ',' + data['Longitude']};
   }
   return ecsData;
+}
+
+function time2slice(t) {
+  // creates a time_slice from a moment object
+  let time_slice = {};
+  let hour = t.format('H');
+  let minute = (5 * Math.floor(t.format('m') / 5 )) % 60;
+  time_slice.name = [hour, minute].join(':');
+  if (minute == 5) {
+    time_slice.name = [hour, '0' + minute].join(':');
+  }
+  else if (minute == 0) {
+    time_slice.name += '0';
+  }
+  let idTime = parseInt(hour) + parseInt(minute)/60;
+  time_slice.id = Math.round((idTime + (idTime >= 4 ? -4 : 20)) * 12);
+  return time_slice;
 }
 
 module.exports = adapter;
