@@ -38,6 +38,8 @@ adapter.types = [
         "dataset": "keyword",
         "duration": "long",
         "end": "date",
+        "ingested": "date",
+        "kind": "keyword",
         "module": "keyword",
         "original": "keyword",
         "start": "date",
@@ -97,6 +99,8 @@ adapter.types = [
         "dataset": "keyword",
         "duration": "long",
         "end": "date",
+        "ingested": "date",
+        "kind": "keyword",
         "module": "keyword",
         "original": "keyword",
         "start": "date",
@@ -365,11 +369,13 @@ function importSleepSummary(c8, conf, firstDate, lastDate) {
         let data = {
           "@timestamp": d.format(),
           "ecs": {
-            "version": "1.0.1"
+            "version": "1.6.0"
           },
           "event": {
             "created": modTime.format(),
             "dataset": "withings.sleep.summary",
+            "ingested": new Date(),
+            "kind": "event",
             "module": "withings",
             "original": JSON.stringify(s),
             "start": startTime.format(),
@@ -657,11 +663,13 @@ function importSleep(c8, conf, firstDate, lastDate) {
           let data = {
             "@timestamp": t.format(),
             "ecs": {
-              "version": "1.0.1"
+              "version": "1.6.0"
             },
             "event": {
               "created": modTime.format(),
               "dataset": "withings.sleep.state",
+              "ingested": new Date(),
+              "kind": "state",
               "module": "withings",
               "original": orig,
               "start": t.format(),
