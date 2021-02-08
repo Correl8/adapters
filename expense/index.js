@@ -70,9 +70,9 @@ adapter.importData = async (c8, conf, opts) => {
     const data = await fetch(url).then(res => res.json())
     if (data && data.length) {
       const bulk = []
-      data.forEach(dayData => {
+      for (dayData of data) {
         let dayCost = 0
-        dayData.forEach(dd => {
+        for (dd of dayData) {
           var id = dd.date + '-' + dd.t
           let data = {
               "@timestamp": dd.date,
@@ -97,9 +97,9 @@ adapter.importData = async (c8, conf, opts) => {
             bulk.push({index: {_index: c8._index, _id: id}})
             bulk.push(data)
             dayCost += dd.cost
-        })
+        }
         console.log(dayData[0].date + ': ' + dayCost)
-      })
+      }
       if (bulk.length > 0) {
         const res = await c8.bulk(bulk)
         let result = c8.trimResults(res)
