@@ -1,15 +1,14 @@
-var request = require("request");
+const fetch = require('node-fetch')
 
-var adapter = {};
+// if no start date is given as an argument,
+// fetch data from last DEFAULT_DAYS days
+var DEFAULT_DAYS = 30
 
-// name that describes the data, used in index names in elasticsearch
-adapter.sensorName = 'example';
+var adapter = {}
 
-// data structure
 adapter.types = [
   {
     name: 'example-sensor',
-    // field names and types will be learned if not specified here
     fields: {
       "@timestamp": 'date',
       "ecs": {
@@ -22,106 +21,119 @@ adapter.types = [
         "start": "date",
       },
       "sensor": {
-        "foo": {
-          "id": 'keyword',
-          "name": 'date'
-        },
+        "id": 'keyword',
+        "foo": 'keyword',
         "bar": {
           "id": 'keyword',
-          "name": 'keyword'
+          "name": 'keyword',
+          "value": 'float'
         },
-        "baz": 'float'
+        "date": 'date'
       }
     }
   }
-];
+]
 
-// configurable settings, see https://www.npmjs.com/package/prompt
 adapter.promptProps = {
   properties: {
     url: {
       description: 'URL'.magenta
     }
   }
-};
-
-adapter.storeConfig = function(c8, result) {
-  return c8.config(result).then(function(){
-    console.log('Configuration stored.');
-    c8.release();
-  });
 }
 
-adapter.importData = function(c8, conf, opts) {
-  return new Promise(function (fulfill, reject){
-    console.log('Getting first date...');
-    var firstDate, lastDate;
-    c8.search({
-      _source: ['timestamp'],
-      size: 1,
-      sort: [{'timestamp': 'desc'}],
-    }).then(function(response) {
-      if (opts.firstDate) {
-        console.log("Setting first time by opts to " + opts.firstDate);
-        firstDate = opts.firstDate;
+adapter.storeConfig = async (c8, result) => {
+  console.log(result)
+  await c8.config(result)
+  console.log('Configuration stored.')
+}
+
+adapter.importData = async (c8, conf, opts) => {
+  try {
+    let firstDate = new Date();
+    if (opts.firstDate) {
+      firstDate = new Date(opts.firstDate);
+      console.log('Setting first time to ' + firstDate);
+    }
+    else {
+      response = await c8.search({
+        _source: ['@timestamp'],
+        size: 1,
+        sort: [{'@timestamp': 'desc'}],
+      });
+      const resp = c8.trimResults(response);
+      if (resp && resp["@timestamp"]) {
+        const d = new Date(resp["@timestamp"]);
+        firstDate.setTime(d.getTime() + 1);
+        console.log('Setting first time to ' + firstDate);
       }
-      else if (response && response.hits && response.hits.hits && response.hits.hits[0] && response.hits.hits[0]._source && response.hits.hits[0]._source.timestamp) {
-        console.log("Setting first time to " + response.hits.hits[0]._source.timestamp);
-        firstDate = new Date(response.hits.hits[0]._source.timestamp);
+    }
+    let url = conf.url + '&from=' + firstDate.toISOString();
+    // const data = await fetch(url).then(res => res.json()) // example.com doesn't really return JSON
+    data = [
+      {
+        "id": 1,
+        "foo": "test-item",
+        "bar": {
+          "id": "test-1",
+          "name": "propertyName",
+          "value": 1.23
+        },
+        "date": "2020-12-31T23:59:59Z"
+      },
+      {
+        "id": 2,
+        "foo": "another-test-item",
+        "bar": {
+          "id": "test-1",
+          "name": "propertyName",
+          "value": 2.34
+        },
+        "date": "2021-01-01T00:00:00Z"
       }
-      else {
-        console.warn("No previously indexed data, setting first time to 0!");
-        firstDate = new Date(0);
-      }
-      var url = conf.url + '&from=' + firstDate.getDate() + '.' + (firstDate.getMonth() + 1) + '.' + firstDate.getFullYear();
-      if (opts.lastDate) {
-        var lastDate = opts.lastDate;
-        url += '&to=' + lastDate.getDate() + '.' + (lastDate.getMonth() + 1) + '.' + lastDate.getFullYear();
-      }
-      var cookieJar = request.jar();
-      request({url: url, jar: cookieJar}, function(error, response, body) {
-        if (error || !response || !body) {
-          reject(new Error('Error getting data: ' + JSON.stringify(response.body)));
+    ]
+    if (data && data.length) {
+      const bulk = []
+      for (item of data) {
+        let values = {
+          "@timestamp": item.date,
+          "event": {
+            "created": new Date(),
+            "module": adapter.types[0].name,
+            "original": JSON.stringify(item),
+            "start": item.date,
+          },
+          "sensor": item
         }
-        var data = JSON.parse(body);
-        if (data && data.length) {
-          var bulk = [];
-          for (var i=0; i<data.length; i++) {
-            var dayData = data[i];
-            for (var j=0; j<dayData.length; j++) {
-              var id = dayData[j].date + '-' + dayData[j].t;
-              bulk.push({index: {_index: c8._index, _type: c8._type, _id: id}});
-              dayData[j].id = id;
-              dayData[j].timestamp = dayData[j].date;
-              bulk.push(dayData[j]);
-              console.log(dayData[j].date);
+        bulk.push({index: {_index: c8._index, _id: item.id}})
+        bulk.push(values)
+      }
+      if (bulk.length > 0) {
+        const res = await c8.bulk(bulk)
+        let result = c8.trimResults(res)
+        if (result.errors) {
+          var messages = [];
+          for (var i=0; i<result.items.length; i++) {
+            if (result.items[i].index.error) {
+              messages.push(i + ': ' + result.items[i].index.error.reason)
             }
           }
-          return c8.bulk(bulk).then(function(response) {
-            let result = c8.trimBulkResults(response);
-            c8.release();
-            if (result.errors) {
-              var messages = [];
-              for (var i=0; i<result.items.length; i++) {
-                if (result.items[i].index.error) {
-                  messages.push(i + ': ' + result.items[i].index.error.reason);
-                }
-              }
-              reject(new Error(messages.length + ' errors in bulk insert:\n ' + messages.join('\n ')));
-            }
-            fulfill('Indexed ' + result.items.length + ' documents in ' + result.took + ' ms.');
-          }).catch(function(error) {
-            c8.release();
-            reject(error);
-          });
+          throw new Error(messages.length + ' errors in bulk insert:\n ' + messages.join('\n '))
+          return
         }
-        else {
-          fulfill('No data available');
-        }
-      });
-    }).catch(function(error) {
-      reject(error);
-    });
-  });
+        return 'Indexed ' + result.items.length + ' documents in ' + result.took + ' ms.'
+      }
+      else {
+        throw new Error('Got data but could not parse indexable items!')
+      }
+    }
+    else {
+      return 'No data available'
+    }
+  }
+  catch(e) {
+    throw new Error(e)
+  }
 }
+
 module.exports = adapter;
