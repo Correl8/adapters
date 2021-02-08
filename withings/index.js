@@ -30,6 +30,7 @@ const redirectUri = 'https://correl8.me/authcallback';
 const authPort = 4343;
 
 const baseUrl = 'https://account.withings.com';
+const apiBase = 'https://wbsapi.withings.net/';
 const dateFormat = 'X';
 
 let adapter = {};
@@ -48,12 +49,31 @@ adapter.types = [
       "event": {
         "created": "date",
         "dataset": "keyword",
-        "duration": "long",
-        "end": "date",
+        "ingested": "date",
+        "kind": "keyword",
         "module": "keyword",
         "original": "keyword",
         "start": "date",
         "timezone": "keyword"
+      },
+      "date_details": {
+        "year": 'long',
+        "month": {
+          "number": 'long',
+          "name": 'keyword',
+        },
+        "week_number": 'long',
+        "day_of_year": 'long',
+        "day_of_month": 'long',
+        "day_of_week": {
+          "number": 'long',
+          "name": 'keyword',
+        }
+      },
+      "time_slice": {
+        "start_hour": 'long',
+        "id": 'long',
+        "name": 'keyword',
       },
       "withings": {
         "updatetime": "date",
@@ -214,7 +234,7 @@ function importMeasures(c8, conf, firstDate, lastDate) {
     try {
       const step4 = {
         method: 'GET',
-        uri: 'https://wbsapi.withings.net/measure',
+        uri: apiBase + 'measure',
         form: {
           action: 'getmeas',
           // get both real measures and objectives
@@ -236,18 +256,36 @@ function importMeasures(c8, conf, firstDate, lastDate) {
         // console.log(grp);
         let d = moment(grp.date * 1000);
         let id = grp.date + '-' + grp.grpid + '-' + grp.category;
+        let slice = time2slice(d);
         let data = {
           "@timestamp": d.format(),
           "ecs": {
-            "version": "1.0.1"
+            "version": "1.6.0"
           },
           "event": {
-            "created": grp.created,
+            "created": grp.created * 1000,
             "dataset": "withings.measure",
+            "ingested": new Date(),
+            "kind": "metric",
             "module": "withings",
             "original": JSON.stringify(grp),
             "start": d.format(),
           },
+          "date_details": {
+            "year": parseInt(d.format('YYYY')),
+            "month": {
+              "number": parseInt(d.format('M')),
+              "name": d.format('MMMM'),
+            },
+            "week_number": parseInt(d.format('W')),
+            "day_of_year": parseInt(d.format('DDD')),
+            "day_of_month": parseInt(d.format('D')),
+            "day_of_week": {
+              "number": parseInt(d.format('d')),
+              "name": d.format('dddd'),
+            }
+          },
+          "time_slice": slice,
           "withings": {
             "updatetime": ts,
             "group_id": grp.id,
@@ -294,6 +332,22 @@ function importMeasures(c8, conf, firstDate, lastDate) {
       reject(new Error(e));
     }
   });
+}
+
+function time2slice(t) {
+  // creates a time_slice from a moment object
+  let hour = t.format('H');
+  let minute = (5 * Math.floor(t.format('m') / 5 )) % 60;
+  let idTime = parseInt(hour) + parseInt(minute)/60;
+  let time_slice = {
+    id: Math.round((idTime + (idTime >= 4 ? -4 : 20)) * 12),
+    name: [hour, minute].join(':'),
+    start_hour: parseInt(hour)
+  };
+  if (minute < 10) {
+    time_slice.name = [hour, '0' + minute].join(':');
+  }
+  return time_slice;
 }
 
 module.exports = adapter;
