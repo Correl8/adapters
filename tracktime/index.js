@@ -39,7 +39,7 @@ var acts = {
   "83": "Radio and recordings",
   "91": "Travel to/from work",
   "92": "Travel related to study",
-  "93": "Travel r. to shopping, services, childcare &amp;c.",
+  "93": "Travel r. to shopping, services, childcare &c.",
   "94": "Travel related to voluntary work and meetings",
   "95": "Travel related to social life",
   "96": "Travel related to other leisure",
@@ -209,8 +209,9 @@ adapter.importData = function(c8, conf, opts) {
         console.log('Setting first time to ' + firstDate);
       }
       else {
-        firstDate = new Date();
-        firstDate.setMonth(firstDate.getMonth() - 1);
+        // firstDate = new Date();
+        // firstDate.setMonth(firstDate.getMonth() - 1);
+        firstDate = new Date(2014, 0, 1);
         console.warn('No previously indexed data, setting first time to ' + firstDate);
       }
       if (opts.lastDate) {
