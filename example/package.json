@@ -4,7 +4,7 @@
   "description": "Import data from Example service into Correl8.me",
   "main": "index.js",
   "dependencies": {
-    "request": "^2.65.0"
+    "node-fetch": "latest"
   },
   "scripts": {
     "start": "node node_modules/correl8-cli/app.js -a ../../index.js"
