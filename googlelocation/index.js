@@ -698,7 +698,7 @@ adapter.importData = function(c8, conf, opts) {
           }
         })
         .on('end', () => {
-          if (0 && finishedBatches > 0) {
+          if (finishedBatches > 0) {
             var updateParams = {
               auth: oauth2Client,
               fileId: file.id,
