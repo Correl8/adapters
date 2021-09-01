@@ -40,6 +40,11 @@ let measureIndex = adapter.sensorName + '-measure';
 
 adapter.types = [
   {
+    // emtpy "type" to share config with sleep adapter
+    name: adapter.sensorName,
+    fields: {}
+  },
+  {
     name: measureIndex,
     fields: {
       "@timestamp": "date",
@@ -90,7 +95,7 @@ adapter.types = [
 ];
 for (var i=1; i<measTypes.length; i++) {
   if (!measTypes[i]) continue;
-  adapter.types[0].fields.withings[measTypes[i].name] = 'float';
+  adapter.types[1].fields.withings[measTypes[i].name] = 'float';
 }
 
 adapter.promptProps = {
@@ -182,10 +187,12 @@ adapter.importData = (c8, conf, opts) => {
   return new Promise(async (fulfill, reject) => {
     try {
       console.log('Getting first date...');
-      const response = await c8.search({
+      const response = await c8.index(measureIndex).search({
         _source: ['withings.updatetime'],
+        // _source: ['@timestamp'],
         size: 1,
         sort: [{'withings.updatetime': 'desc'}],
+        // sort: [{'@timestamp': 'desc'}],
       });
       const resp = c8.trimResults(response);
       let firstDate = new Date();
@@ -195,7 +202,14 @@ adapter.importData = (c8, conf, opts) => {
         firstDate = new Date(opts.firstDate);
         console.log('Setting first time to ' + firstDate);
       }
-      else if (resp && resp.withings.updatetime) {
+/*
+      else if (resp && resp['@timestamp']) { // temp, for re-indexing
+        firstDate = new Date(resp['@timestamp']);
+        firstDate.setTime(firstDate.getTime() + 1000);
+        console.log('Setting first time to ' + firstDate);
+      }
+*/
+      else if (resp && resp.withings && resp.withings.updatetime) {
         firstDate = new Date(resp.withings.updatetime);
         console.log('Setting first time to ' + firstDate);
       }

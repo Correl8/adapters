@@ -6,8 +6,8 @@
   "dependencies": {
     "correl8-cli": "latest",
     "google-fit-activity-types": "latest",
-    "googleapis": "^61.0.0",
-    "moment": "^2.29.1",
+    "googleapis": "latest",
+    "moment": "latest",
     "path": "latest",
     "prompt": "latest"
   },

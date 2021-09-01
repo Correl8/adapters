@@ -14,13 +14,14 @@ const path = require('path');
 const SCOPES = ['https://www.googleapis.com/auth/drive'];
 
 const MAX_FILES = 5;
-const MAX_ZIP_ENTRIES = 500000;
-const MAX_BULK_BATCH = 1000;
+const MAX_CONCURRENT_FILES = 1;
+const MAX_BULK_BATCH = 50;
 
 var adapter = {};
 let finishedBatches = 0;
 let totalActions = 0;
 let fileActions = 0;
+let concurrentFiles = 0;
 let driveStream;
 
 adapter.sensorName = 'googleactivity';
@@ -51,17 +52,26 @@ adapter.types = [
         "time": 'keyword',
         "header": 'keyword',
         "title": 'keyword',
+        "titleUrl": 'keyword',
+        "subtitles": {
+          "name": 'keyword',
+        },
         "products": 'keyword',
-        "actionType": 'keyword',
-        "target": 'keyword',
-        "actionString": 'text',
-        "actionUrl": 'keyword',
-        "locations": 'keyword',
-        "coords": 'geo_point',
+        // "actionType": 'keyword',
+        // "target": 'keyword',
+        // "actionString": 'text',
+        // "actionUrl": 'keyword',
+        // "locations": 'keyword',
+        "locationInfos": {
+          "name": 'text',
+          "url": 'keyword',
+          "source": 'text',
+          "sourceUrl": 'keyword',
+        },
         "details": {
           "name": 'keyword',
         },
-        "service": 'keyword'
+        // "service": 'keyword'
       }
     }
   }
@@ -139,11 +149,10 @@ adapter.storeConfig = (c8, result) => {
   });
 };
 
-adapter.importData = (c8, conf, opts) => {
-  return new Promise((fulfill, reject) => {
-    let results = [];
+adapter.importData = async (c8, conf, opts) => {
+  try {
     if (!conf.credentials) {
-      reject(new Error('Authentication credentials not found. Configure first!'));
+      throw new Error('Authentication credentials not found. Configure first!');
       return;
     }
     var drive = google.drive('v3');
@@ -153,58 +162,25 @@ adapter.importData = (c8, conf, opts) => {
     var redirectUrl = conf.installed.redirect_uris[0];
     var oauth2Client = new auth.OAuth2(clientId, clientSecret, redirectUrl);
     oauth2Client.credentials = conf.credentials;
-    drive.files.list({
+    const response = await drive.files.list({
       auth: oauth2Client,
       spaces: "drive",
       q: "trashed != true and '" + conf.inputDir + "' in parents and mimeType='application/x-gtar'",
       pageSize: MAX_FILES,
       fields: "files(id, name)"
-    }, (err, response) => {
-      if (err) {
-        reject(new Error(err));
-        return;
-      }
-      var files = response.data.files;
-      if (files.length <= 0) {
-        fulfill('No Takeout archives found in Drive folder ' + conf.inputDir);
-      }
-      else {
-        let results = [];
-        for (let i = 0; i < files.length; i++) {
+    });
+    var files = response.data.files;
+    if (files.length <= 0) {
+      return 'No Takeout archives found in Drive folder ' + conf.inputDir;
+    }
+    else {
+      results = [];
+      for (let i = 0; i < files.length; i++) {
           let file = files[i];
           let fileName = file.name;
           console.log('Processing file ' + i + ': ' + fileName);
-/*
-          let driveStream = drive.files.get({
-            auth: oauth2Client,
-            fileId: file.id,
-            alt: 'media'
-          }).then((res) => {
-            console.log(res);
-          });
-*/
-          // temporary workaround
           let url = 'https://www.googleapis.com/drive/v3/files/' + file.id + '?alt=media&mimeType=application/x-gtar';
           driveStream = request.get({url: url, headers: {'Authorization': 'Bearer ' + oauth2Client.credentials.access_token}});
-/*
-          const pipeline = chain([
-            driveStream,
-            tar.x({filter: (path, entry) => {
-              if (path.indexOf('.json') > 0) {
-                // console.log('Processing ' + path);
-                return true;
-              }
-              console.log('Skipping ' + path);
-              return false;
-            }})
-          ]);
-          pipeline.on('entry', (data) => {
-            console.log(JSON.stgingify(data, null, 1));
-          });
-	  pipeline.on('end', () => {
-            console.log('End of pipeline!');
-          });
-*/
           if (!driveStream) {
             console.error('stream failed for file ' + file.id + '!');
             continue;
@@ -223,7 +199,7 @@ adapter.importData = (c8, conf, opts) => {
           });
           driveStream.pipe(
             tar.x({filter: (path, entry) => {
-              if (path.indexOf('.json') > 0) {
+              if (path.indexOf('MyActivity.json') > 0) {
                 // console.log('Processing ' + path);
                 return true;
               }
@@ -249,15 +225,15 @@ adapter.importData = (c8, conf, opts) => {
             .on('error', (error) => {
               console.log('Error processing tar entry ' + substream.path);
               console.log(new Error(error));
-              // reject(error);
+              // throw new Error(error);
             })
             .pipe(jsonstream)
             .on('error', (error) => {
               console.log('Error processing JSON stream in ' + substream.path);
               console.log(new Error(error));
-              // reject(error);
+              // throw new Error(error);
             })
-            .on('data', async (data) => {
+            .on('data', (data) => {
               if (data.value && data.value.length) {
                 bulk = [];
                 for (var i=0; i<data.value.length; i++) {
@@ -292,64 +268,81 @@ adapter.importData = (c8, conf, opts) => {
                     totalActions++;
                     if (bulk.length >= (MAX_BULK_BATCH * 2)) {
                       jsonstream.pause();
+                      // console.log(bulk)
+                      // process.exit();
                       let clone = bulk.slice(0);
                       bulk = [];
-                      results.push(await indexBulk(clone, conf, c8).catch((error) => {reject(new Error(error));}));
+                      let promise = indexBulk(clone, conf, c8).then((result) => {
+                        jsonstream.resume();
+                      }).catch((error) => {
+                        throw new Error(error);
+                      });
                       // console.log('Started ' + results.length + ' bulk batches (' + clone[1]['@timestamp'] + ')');
-                      jsonstream.resume();
+                      results.push(promise);
                     }
                   }
                 }
                 console.log(substream.path + ': ' + fileActions + ' activities.');
               }
             })
-            .on('end', async () => {
+            .on('end', () => {
               if (bulk.length > 0) {
                 // console.log(bulk);
-                results.push(await indexBulk(bulk, conf, c8).catch((error) => {reject(new Error(error));}));
+                // process.exit();
+                let promise = indexBulk(bulk, conf, c8).catch((error) => { throw new Error(error);});
+                results.push(promise);
                 // console.log('Handled ' + substream.path + '. Started ' + results.length + ' bulk batches (' + bulk[1]['@timestamp'] + ', last of ' + substream.path + ')');
               }
             })
           })
           .on('finish', () => {
-            console.log('finish');
+            // console.log('finish');
           })
           .on('end', () => {
-            console.log('end');
-            if (totalActions > 0) {
-              var updateParams = {
-                auth: oauth2Client,
-                fileId: file.id,
-                addParents: conf.outputDir,
-                removeParents: conf.inputDir,
-                fields: 'id, parents'
-              };
-              drive.files.update(updateParams, (err, updated) => {
-                if(err) {
-                  reject(new Error(err));
-                  return;
-                }
-                else {
-                  fulfill('Indexed ' + totalActions + ' activities. Moved ' + file.name + ' from ' + conf.inputDir + ' to ' + conf.outputDir);
-                }
-              });
-            }
-            else {
-              fulfill('No activity history in ' + file.name);
-            }
+            // console.log('end');
+            Promise.all(results).then((res) => {
+              if (totalActions > 0) {
+                var updateParams = {
+                  auth: oauth2Client,
+                  fileId: file.id,
+                  addParents: conf.outputDir,
+                  removeParents: conf.inputDir,
+                  fields: 'id, parents'
+                };
+                // drive.files.update(updateParams, (err, updated) => {
+                //   if(err) {
+                //     throw new Error(err);
+                //     return;
+                //   }
+                //  else {
+                //     return 'Indexed ' + totalActions + ' activities. Moved ' + file.name + ' from ' + conf.inputDir + ' to ' + conf.outputDir;
+                //   }
+                // });
+              }
+              else {
+                return 'No activity history in ' + file.name;
+              }
+            });
           });
-        }
-        console.log('Found ' + files.length + ' file' + (files.length == 1 ? '' : 's') + ' in ' + conf.inputDir);
       }
-    });
-  });
+      console.log('Found ' + files.length + ' file' + (files.length == 1 ? '' : 's') + ' in ' + conf.inputDir);
+    }
+    // });
+  }
+  catch (e) {
+    throw new Error(e);
+  }
+  return "Async import started..."
 };
 
-function indexBulk(bulkData, oonf, c8) {
+indexBulk = async (bulkData, oonf, c8) => {
   return new Promise(async (fulfill, reject) => {
     try {
+      console.log(bulkData);
       let response = await c8.bulk(bulkData);
       let result = c8.trimBulkResults(response);
+      console.log(result);
+      process.exit();
       if (result.errors) {
         if (result.items) {
           let errors = [];
@@ -361,7 +354,7 @@ function indexBulk(bulkData, oonf, c8) {
           reject(new Error(errors.length + ' errors in bulk insert:\n ' + errors.join('\n ')));
         }
         else {
-          reject(new Error(JSON.stringify(result.errors))); 
+          reject(new Error(JSON.stringify(result.errors)));
         }
       }
       // process.stdout.write('>');
@@ -369,7 +362,7 @@ function indexBulk(bulkData, oonf, c8) {
       fulfill(result);
     }
     catch (e) {
-      reject(e);
+      reject(new Error(e));
     }
   });
 }

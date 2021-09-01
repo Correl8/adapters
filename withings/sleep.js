@@ -27,6 +27,11 @@ let sleepSummaryIndex = adapter.sensorName + '-sleep-summary';
 
 adapter.types = [
   {
+    // emtpy "type" to share config with body adapter
+    name: adapter.sensorName,
+    fields: {}
+  },
+  {
     name: sleepIndex,
     fields: {
       "@timestamp": "date",
@@ -325,7 +330,7 @@ function importSleepSummary(c8, conf, firstDate, lastDate) {
         uri: 'https://wbsapi.withings.net/v2/sleep',
         form: {
           action: 'getsummary',
-          data_fields: Object.keys(adapter.types[1].fields.withings.data).join(',')
+          data_fields: Object.keys(adapter.types[2].fields.withings).join(',')
         },
         headers: {
           Authorization: 'Bearer ' + conf.access_token
@@ -733,18 +738,17 @@ function importSleep(c8, conf, firstDate, lastDate) {
 
 function time2slice(t) {
   // creates a time_slice from a moment object
-  let time_slice = {};
   let hour = t.format('H');
   let minute = (5 * Math.floor(t.format('m') / 5 )) % 60;
-  time_slice.name = [hour, minute].join(':');
-  if (minute == 5) {
+  let idTime = parseInt(hour) + parseInt(minute)/60;
+  let time_slice = {
+    id: Math.round((idTime + (idTime >= 4 ? -4 : 20)) * 12),
+    name: [hour, minute].join(':'),
+    start_hour: parseInt(hour)
+  };
+  if (minute < 10) {
     time_slice.name = [hour, '0' + minute].join(':');
   }
-  else if (minute == 0) {
-    time_slice.name += '0';
-  }
-  let idTime = parseInt(hour) + parseInt(minute)/60;
-  time_slice.id = Math.round((idTime + (idTime >= 4 ? -4 : 20)) * 12);
   return time_slice;
 }
 

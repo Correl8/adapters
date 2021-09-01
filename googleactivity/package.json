@@ -6,9 +6,9 @@
   "dependencies": {
     "compressing": "latest",
     "correl8-cli": "latest",
-    "googleapis": "latest",
+    "googleapis": "^85.0.0",
     "htmlparser2": "latest",
-    "moment": "latest",
+    "moment": "^2.29.1",
     "prompt": "latest",
     "request": "latest",
     "request-stream": "latest",

@@ -4,10 +4,10 @@
   "description": "Import data from Google Sheets into Correl8.me",
   "main": "index.js",
   "dependencies": {
-    "correl8-cli": "^0.1.0",
-    "google-auth-library": "^0.9.8",
-    "googleapis": "^12.0.0",
-    "prompt": "^1.0.0"
+    "correl8-cli": "latest",
+    "googleapis": "latest",
+    "moment": "latest",
+    "prompt": "latest"
   },
   "devDependencies": {},
   "scripts": {

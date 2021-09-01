@@ -103,6 +103,7 @@ function getRecent(c8, lfm, params) {
         console.trace(err);
       }
       console.log(recentTracks.track.length + ' tracks');
+      // console.log(recentTracks);
       var bulk = [];
       if (params.page < recentTracks['@attr'].totalPages) {
         params.page++;

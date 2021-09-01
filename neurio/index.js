@@ -448,9 +448,9 @@ getAppliancePage = async (c8, client, locId, firstDate, lastDate, minPower, perP
           applianceResults += await getAppliancePage(c8, client, locId, firstDate, lastDate, minPower, perPage, page);
         }
       }
-      else {
-        console.log('No appliance events indexed.');
-      }
+    }
+    else {
+      console.log('No appliance events indexed.');
     }
   }
   catch(e) {
@@ -472,19 +472,19 @@ getSamplesHistoryPage = async (c8, client, sensorId, start, end, granularity, fr
       values.consumptionEnergy = delta;
       cumulative += delta;
       values.cumulativeConsumption = cumulative
-      let st = new Date(values.timestamp);
+      let et = new Date(values.timestamp);
+      let st = new Date(et.getTime() - 5 * 60 * 1000); // 5 minute intervals
       const start = moment(st.getTime());
-      let et = new Date(st.getTime() + 5 * 60 * 1000); // 5 minute intervals
       const logStr = values.timestamp + ' ' + (values.netPower || values.consumptionPower) + ' W, ' + (values.netEnergy || values.consumptionEnergy) + ' Ws';
       // console.log(logStr);
       bulk.push({index: {_index: c8.type(sampleType)._index, _id: st}});
       let data = {
-        "@timestamp": st,
+        "@timestamp": et,
         "ecs": {
           "version": '1.6.0'
         },
         "event": {
-          "created": st,
+          "created": et,
           "dataset": "neurio.history_samples",
           "duration": (et.getTime() - st.getTime()) * 1E6, // ms to ns
           "end": et,
@@ -663,18 +663,17 @@ getEnergyStats = async (c8, client, sensorId, start, end, granularity, frequency
 
 function time2slice(t) {
   // creates a time_slice from a moment object
-  let time_slice = {};
   let hour = t.format('H');
   let minute = (5 * Math.floor(t.format('m') / 5 )) % 60;
-  time_slice.name = [hour, minute].join(':');
-  if (minute == 5) {
+  let idTime = parseInt(hour) + parseInt(minute)/60;
+  let time_slice = {
+    id: Math.round((idTime + (idTime >= 4 ? -4 : 20)) * 12),
+    name: [hour, minute].join(':'),
+    start_hour: parseInt(hour)
+  };
+  if (minute < 10) {
     time_slice.name = [hour, '0' + minute].join(':');
   }
-  else if (minute == 0) {
-    time_slice.name += '0';
-  }
-  let idTime = parseInt(hour) + parseInt(minute)/60;
-  time_slice.id = Math.round((idTime + (idTime >= 4 ? -4 : 20)) * 12);
   return time_slice;
 }
 
