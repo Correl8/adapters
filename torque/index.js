@@ -167,81 +167,107 @@ adapter.importData = (c8, conf, opts) => {
       drive.files.list({
         auth: oauth2Client,
         spaces: 'drive',
-        q: "'" + conf.inputDir + "' in parents and trashed != true and (mimeType='text/csv' or mimeType='text/comma-separated-values')",
+        q: "'" + conf.inputDir + "' in parents and trashed != true and (mimeType='application/vnd.google-apps.folder')",
         pageSize: MAX_FILES,
         orderBy: 'modifiedTime desc',
-        fields: "files(id, name, createdTime, webContentLink)"
-      }, (err, response) => {
-        // console.log(response.data.files);
-        if (err) {
-          reject(err);
+        fields: "files(id, name)"
+      }, (foldererr, folderresponse) => {
+        if (foldererr) {
+          reject(foldererr);
           return;
         }
-        var files = response.data.files;
-        if (files.length <= 0) {
-          fulfill('No logs found in Drive folder ' + conf.inputDir);
+        // console.log(folderresponse.data.files);
+        var folders = folderresponse.data.files;
+        if (folders.length <= 0) {
+          fulfill('No log folders found in Drive folder ' + conf.inputDir);
+          return;
         }
-        else {
-          let results = [];
-          for (let i = 0; i < files.length; i++) {
-            const file = files[i];
-            const fileName = file.name;
-            const cTime = file.createdTime;
-            const opts = {
-              auth: oauth2Client,
-              fileId: file.id,
-              alt: 'media'
-            };
-            drive.files.get(opts, (error, content) => {
-              if (error) {
-                reject(error);
-                return;
-              }
-              // console.log(content.data);
-              // process.exit();
-              parse(content.data, csvParserOpts, async (err, parsed) => {
-                let bulk = [];
-                if (err) {
-                  reject(err);
+        for (folder of folders) {
+          if (folder.id == conf.outputDir) {
+            continue;
+          }
+          drive.files.list({
+            auth: oauth2Client,
+            spaces: 'drive',
+            q: "'" + folder.id + "' in parents and trashed != true and (mimeType='text/csv' or mimeType='text/comma-separated-values')",
+            pageSize: MAX_FILES,
+            orderBy: 'modifiedTime desc',
+            fields: "files(id, name, createdTime, webContentLink)"
+          }, (err, response) => {
+            // console.log(response.data.files);
+            if (err) {
+              reject(err);
+              return;
+            }
+            var files = response.data.files;
+            if (files.length <= 0) {
+              fulfill('No logs found in Drive folder ' + conf.inputDir);
+              return;
+            }
+            let results = [];
+            for (let i = 0; i < files.length; i++) {
+              const file = files[i];
+              const fileName = folder.name + '/' + file.name;
+              const cTime = file.createdTime;
+              const opts = {
+                auth: oauth2Client,
+                fileId: file.id,
+                alt: 'media'
+              };
+              drive.files.get(opts, (error, content) => {
+                if (error) {
+                  reject(error);
                   return;
                 }
-                let sessionId = 1;
-                // console.log(JSON.stringify(parsed));
-                for (let i=0; i<parsed.length; i++) {
-                  var returned = prepareRow(parsed[i], fileName, sessionId);
-                  // console.log(returned);
-                  data = returned;
-                  if (data && data.odb2 && data.odb2.session) {
-                    data.event.created = moment(cTime).format();
-                    data.event.sequence = i;
-                    sessionId = data.odb2.session.replace(/^.*-(\d+)$/, '$1');
-                    if (data.ecs) {
-                      bulk.push({index: {_index: c8._index, _id: data["@timestamp"]}});
-                      bulk.push(data);
-                    }
-                  }
-                }
-                if (bulk.length > 0) {
-                  // console.log(bulk);
-                  // return;
-                  const response = await c8.bulk(bulk);
-                  const result = c8.trimBulkResults(response);
-                  if (result.errors) {
-                    let errors = [];
-                    for (let x=0; x<result.items.length; x++) {
-                      if (result.items[x].index.error) {
-                        errors.push(x + ': ' + result.items[x].index.error.reason);
-                      }
-                    }
-                    reject(new Error(fileName + ': ' + errors.length + ' errors in bulk insert:\n ' + errors.join('\n ')));
+                // console.log(content.data);
+                // process.exit();
+                parse(content.data, csvParserOpts, async (err, parsed) => {
+                  let bulk = [];
+                  if (err) {
+                    reject(err);
                     return;
                   }
-                  console.log(fileName + ': ' + result.items.length + ' rows, ' + sessionId + ' session' + ((sessionId != 1) ? 's' : ''));
-                  // fulfill(result);
-                  // fulfill('Indexed ' + totalRows + ' log rows in ' + res.length + ' files. Took ' + totalTime + ' ms.');
+                  let sessionId = 1;
+                  // console.log(JSON.stringify(parsed));
+                  for (let i=0; i<parsed.length; i++) {
+                    var returned = prepareRow(parsed[i], folder.name, sessionId);
+                    // console.log(returned);
+                    data = returned;
+                    if (data && data.odb2 && data.odb2.session) {
+                      data.event.created = moment(cTime).format();
+                      data.event.sequence = i;
+                      sessionId = data.odb2.session.replace(/^.*-(\d+)$/, '$1');
+                      if (data.ecs) {
+                        bulk.push({index: {_index: c8._index, _id: data["@timestamp"]}});
+                        bulk.push(data);
+                      }
+                    }
+                  }
+                  if (bulk.length > 0) {
+                    // console.log(bulk);
+                    // return;
+                    const response = await c8.bulk(bulk);
+                    const result = c8.trimBulkResults(response);
+                    if (result.errors) {
+                      let errors = [];
+                      for (let x=0; x<result.items.length; x++) {
+                        if (result.items[x].index.error) {
+                          errors.push(x + ': ' + result.items[x].index.error.reason);
+                        }
+                      }
+                      reject(new Error(fileName + ': ' + errors.length + ' errors in bulk insert:\n ' + errors.join('\n ')));
+                      return;
+                    }
+                    console.log(new Date(parseInt(folder.name)) + ': ' + result.items.length + ' rows, ' + sessionId + ' session' + ((sessionId != 1) ? 's' : ''));
+                    // fulfill(result);
+                    // fulfill('Indexed ' + totalRows + ' log rows in ' + res.length + ' files. Took ' + totalTime + ' ms.');
+                  }
+                  else {
+                    fulfill('No data to import');
+                  }
                   var updateParams = {
                     auth: oauth2Client,
-                    fileId: file.id,
+                    fileId: folder.id,
                     addParents: conf.outputDir,
                     removeParents: conf.inputDir,
                     fields: 'id, parents'
@@ -252,17 +278,13 @@ adapter.importData = (c8, conf, opts) => {
                       return;
                     }
                     else {
-                      fulfill('Moved ' + file.name + ' from ' + conf.inputDir + ' to ' + conf.outputDir);
+                      fulfill('Moved ' + folder.name + ' from ' + conf.inputDir + ' to ' + conf.outputDir);
                     }
                   });
-                }
-                else {
-                  fulfill('No data to import');
-                }
-                // console.log(data);
+                });
               });
-            });
-          }
+            }
+          });
         }
       });
     }
