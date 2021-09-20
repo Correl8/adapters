@@ -150,7 +150,16 @@ adapter.types = [
           "rr_min": "float",
           "sleep_score": "float",
           "snoring": "float",
-          "snoringepisodecount": "float"
+          "snoringepisodecount": "float",
+          // "night_events": "float",
+          "out_of_bed_count": "float",
+          "nb_rem_episodes": "float",
+          "sleep_efficiency": "float",
+          "sleep_latency": "float",
+          "total_sleep_time": "float",
+          "total_timeinbed": "float",
+          "wakeup_latency": "float",
+          "waso": "float",
         }
       },
       "sleep": {
@@ -324,13 +333,12 @@ adapter.importData = (c8, conf, opts) => {
 function importSleepSummary(c8, conf, firstDate, lastDate) {
   return new Promise(async (fulfill, reject) => {
     try {
-      
       const step4 = {
         method: 'GET',
         uri: 'https://wbsapi.withings.net/v2/sleep',
         form: {
           action: 'getsummary',
-          data_fields: Object.keys(adapter.types[2].fields.withings).join(',')
+          data_fields: Object.keys(adapter.types[2].fields.withings.data).join(',')
         },
         headers: {
           Authorization: 'Bearer ' + conf.access_token
@@ -412,12 +420,12 @@ function importSleepSummary(c8, conf, firstDate, lastDate) {
               "value": s.data.sleep_score,
             },
             "duration_seconds": duration_seconds,
-            "total_seconds": s.data.deepsleepduration + s.data.lightsleepduration + s.data.remsleepduration,
-            "awake_seconds": s.data.wakeupduration,
+            "total_seconds": s.data.total_sleep_time,
+            "awake_seconds": s.data.sleep_latency + s.data.waso + s.data.wakeup_latency,
             "light_seconds": s.data.lightsleepduration,
             "rem_seconds": s.data.remsleepduration,
             "deep_seconds": s.data.deepsleepduration,
-            "onset_latency_seconds": s.data.durationtosleep,
+            "onset_latency_seconds": s.data.sleep_latency,
             "hr_lowest": s.data.hr_min,
             "hr_average": s.data.hr_average,
             "breath_average": s.data.rr_average,
