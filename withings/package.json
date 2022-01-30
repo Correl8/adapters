@@ -11,10 +11,8 @@
     "request": "latest",
     "request-promise": "latest",
     "url": "latest",
-    "uuid": "latest",
-    "withings-oauth2": "latest"
+    "uuid": "latest"
   },
-  "devDependencies": {},
   "scripts": {
     "start": "node node_modules/correl8-cli/app.js -a ../../index.js"
   },
