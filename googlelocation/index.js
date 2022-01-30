@@ -378,8 +378,7 @@ adapter.storeConfig = async function(c8, result) {
   }
 };
 
-adapter.importData = function(c8, conf, opts) {
-  return new Promise(async (fulfill, reject) => {
+adapter.importData = async (c8, conf, opts) => {
   if (!conf.credentials) {
     throw new Error('Authentication credentials not found. Configure first!');
   }
@@ -396,338 +395,332 @@ adapter.importData = function(c8, conf, opts) {
   var redirectUrl = conf.installed.redirect_uris[0];
   var oauth2Client = new auth.OAuth2(clientId, clientSecret, redirectUrl);
   oauth2Client.credentials = conf.credentials;
-  drive.files.list({
+  const response = await drive.files.list({
     auth: oauth2Client,
     spaces: "drive",
     q: "trashed != true and '" + conf.inputDir + "' in parents and mimeType='application/x-gtar'",
     pageSize: MAX_FILES,
     fields: "files(id, name)"
-  },
-  (err, response) => {
-    if (err) {
-      throw new Error(err);
-    }
-    var files = response.data.files;
-    if (files.length <= 0) {
-      fulfill('No Takeout archives found in Drive folder ' + conf.inputDir);
-    }
-    else {
-      for (let i = 0; i < files.length; i++) {
-        let file = files[i];
-        let fileName = file.name;
-        let bulk = [];
-        console.log('Processing file ' + (i+1) + ': ' + fileName);
-        
-        let oauth = {
-          consumer_key: clientId,
-          consumer_secret: clientSecret,
-          token: conf.credentials.access_token
+  });
+  var files = response.data.files;
+  if (files.length <= 0) {
+    fulfill('No Takeout archives found in Drive folder ' + conf.inputDir);
+  }
+  else {
+    for (let i = 0; i < files.length; i++) {
+      let file = files[i];
+      let fileName = file.name;
+      let bulk = [];
+      console.log('Processing file ' + (i+1) + ': ' + fileName);
+      
+      let oauth = {
+        consumer_key: clientId,
+        consumer_secret: clientSecret,
+        token: conf.credentials.access_token
+      }
+      let url = 'https://www.googleapis.com/drive/v3/files/' + file.id + '?alt=media';
+      let driveStream = request.get({url: url, headers: {'Authorization': 'Bearer ' + oauth2Client.credentials.access_token}});
+      if (!driveStream) {
+        console.error('stream failed for file ' + file.id + '!');
+        continue;
+      }
+      driveStream
+      .on('error', (error) => {
+        console.error(new Error('driveStream error: ' + error));
+        return;
+      })
+      .pipe(tar.x({filter: (path, entry) => {
+        if (path.indexOf('.json') > 0) {
+          return true;
         }
-        let url = 'https://www.googleapis.com/drive/v3/files/' + file.id + '?alt=media';
-        let driveStream = request.get({url: url, headers: {'Authorization': 'Bearer ' + oauth2Client.credentials.access_token}});
-        if (!driveStream) {
-          console.error('stream failed for file ' + file.id + '!');
-          continue;
-        }
-        driveStream
-        .on('error', (error) => {
-          console.error(new Error('driveStream error: ' + error));
-          return;
-        })
-        .pipe(tar.x({filter: (path, entry) => {
-          if (path.indexOf('.json') > 0) {
-            return true;
+        console.log('Skipping ' + path);
+        return false;
+      }}))
+      .on('error', (error) => {
+        console.error(new Error('tar.x stream error: ' + error));
+        return;
+      })
+      .on('entry', (substream) => {
+        console.log(substream.mtime + ': ' + substream.path + ' (' + Math.round(substream.size/1024) + ' kB)');
+        eos(substream, (err) => {
+          if (err) {
+            console.log('tar entry stream had an error or closed early');
+            return;
           }
-          console.log('Skipping ' + path);
-          return false;
-        }}))
-        .on('error', (error) => {
-          console.error(new Error('tar.x stream error: ' + error));
-          return;
-        })
-        .on('entry', (substream) => {
-          console.log(substream.mtime + ': ' + substream.path + ' (' + Math.round(substream.size/1024) + ' kB)');
-          eos(substream, (err) => {
-            if (err) {
-              console.log('tar entry stream had an error or closed early');
-              return;
+        });
+        if (substream.path.indexOf('Location History.json') > 0) {
+          let parse = JSONStream.parse('locations.*');
+          let results = [];
+          substream.pipe(parse)
+          .on('data', async (data) => {
+            let start = moment(Number(data.timestampMs));
+            let position = data.location || {};
+            position.geo = {
+              "location": data.latitudeE7/1E7+','+data.longitudeE7/1E7
+            };
+            if (data.accuracy) {
+              position.accuracy = data.accuracy;
             }
-          });
-          if (substream.path.indexOf('Location History.json') > 0) {
-            let parse = JSONStream.parse('locations.*');
-            let results = [];
-            substream.pipe(parse)
-            .on('data', async (data) => {
-              let start = moment(Number(data.timestampMs));
-              let position = data.location || {};
-              position.geo = {
-                "location": data.latitudeE7/1E7+','+data.longitudeE7/1E7
-              };
-              if (data.accuracy) {
-                position.accuracy = data.accuracy;
+            let values = {
+              "@timestamp": start.format(),
+              "ecs": {
+                "version": "1.6.0"
+              },
+              "event": {
+                "created": substream.mtime,
+                "dataset": "google.location",
+                "ingested": new Date(),
+                "kind": "event",
+                "module": "Takeout",
+                "original": JSON.stringify(data),
+                "start":  start.format(),
+              },
+              "time_slice": time2slice(start),
+              "date_details": time2details(start),
+            };
+            if (data.activity && data.activity.length) {
+              for (let j=0; j<data.activity.length; j++) {
+                let a = data.activity[j];
+                let clone = Object.assign({}, values);
+                clone["@timestamp"] = moment(Number(a.timestampMs));
+                clone["time_slice"] = time2slice(clone["@timestamp"]),
+                clone["date_details"] = time2details(clone["@timestamp"]),
+                clone.event.original = JSON.stringify(a);
+                for (let k=0; k<a.activity.length; k++) {
+                  let subclone = Object.assign({}, clone);
+                  subclone.activity = a.activity[k];
+                  let meta = {
+                    index: {
+                      _index: c8.type(adapter.types[1].name)._index,
+                      _id: subclone["@timestamp"] + '-' + k
+                    }
+                  };
+                  bulk.push(meta);
+                  bulk.push(subclone);
+                  await checkBulk(bulk, substream.path, c8, parse);
+                }
               }
-              let values = {
+            }
+            values.position = position;
+            let meta = {
+              index: {
+                _index: c8.type(adapter.types[0].name)._index,
+                _id: data.timestampMs
+              }
+            };
+            bulk.push(meta);
+            bulk.push(values);
+            await checkBulk(bulk, substream.path, c8, parse);
+          })
+          .on('end', async () => {
+            // console.log('Last batch of ' + substream.path + '!');
+            await checkBulk(bulk, substream.path, c8);
+          })
+          .on('error', (error) => {
+            console.log('Error processing ' + substream.path);
+            console.log(new Error(error));
+          });
+        }
+        else {
+          let parse = JSONStream.parse('timelineObjects.*');
+          let results = [];
+          substream.pipe(parse)
+          .on('data', async (data) => {
+            let template = {
+              "ecs": {
+                "version": "1.6.0"
+              },
+              "event": {
+                "created": substream.mtime,
+                "dataset": "google.location",
+                "ingested": new Date(),
+                "kind": "event",
+                "module": "Takeout",
+              }
+            };
+            
+            let as = data.activitySegment;
+            let pv = data.placeVisit;
+            if (as) {
+              let s = Number(as.duration.startTimestampMs);
+              let e = Number(as.duration.endTimestampMs);
+              let start = moment(s);
+              let end = moment(e);
+              let duration = (e - s) * 1E6;
+              let sl = as.startLocation;
+              let el = as.endLocation;
+              
+              let values = Object.assign(Object.assign({}, template), {
                 "@timestamp": start.format(),
-                "ecs": {
-                  "version": "1.6.0"
-                },
                 "event": {
-                  "created": substream.mtime,
-                  "dataset": "google.location",
-                  "ingested": new Date(),
-                  "kind": "event",
-                  "module": "Takeout",
-                  "original": JSON.stringify(data),
-                  "start":  start.format(),
+                  "end": end.format(),
+                  "duration": duration,
+                  "original": JSON.stringify(as),
+                  "start": start.format(),
                 },
                 "time_slice": time2slice(start),
                 "date_details": time2details(start),
-              };
-              if (data.activity && data.activity.length) {
-                for (let j=0; j<data.activity.length; j++) {
-                  let a = data.activity[j];
-                  let clone = Object.assign({}, values);
-                  clone["@timestamp"] = moment(Number(a.timestampMs));
-                  clone["time_slice"] = time2slice(clone["@timestamp"]),
-                  clone["date_details"] = time2details(clone["@timestamp"]),
-                  clone.event.original = JSON.stringify(a);
-                  for (let k=0; k<a.activity.length; k++) {
-                    let subclone = Object.assign({}, clone);
-                    subclone.activity = a.activity[k];
-                    let meta = {
-                      index: {
-                        _index: c8.type(adapter.types[1].name)._index,
-                        _id: subclone["@timestamp"] + '-' + k
-                      }
-                    };
-                    bulk.push(meta);
-                    bulk.push(subclone);
-                    await checkBulk(bulk, substream.path, c8, parse);
-                  }
+                "activity_segment": {
+                  "start": {
+                    "sourceInfo": sl.sourceInfo
+                  },
+                  "end": {
+                    "sourceInfo": el.sourceInfo
+                  },
+                  "distance": as.distance,
+                  "confidence": as.confidence,
+                  "activities": as.activities,
+                  "waypoints": as.waypoints,
+                  "editConfirmationStatus": as.editConfirmationStatus
                 }
+              });
+              if (sl.latitudeE7) {
+                values.activity_segment.start.geo = {
+                  "location": sl.latitudeE7/1E7+','+sl.longitudeE7/1E7,
+                };
+                values.position = {
+                  "geo": {
+                    "location": sl.latitudeE7/1E7+','+sl.longitudeE7/1E7
+                  }
+                };
               }
-              values.position = position;
+              if (el.latitudeE7) {
+                values.activity_segment.end.geo = {
+                  "location": el.latitudeE7/1E7+','+el.longitudeE7/1E7,
+                };
+              }
               let meta = {
                 index: {
-                  _index: c8.type(adapter.types[0].name)._index,
-                  _id: data.timestampMs
+                  _index: c8.type(adapter.types[2].name)._index,
+                  _id: values["@timestamp"] + '-activitysegment'
                 }
               };
               bulk.push(meta);
               bulk.push(values);
               await checkBulk(bulk, substream.path, c8, parse);
-            })
-            .on('end', async () => {
-              // console.log('Last batch of ' + substream.path + '!');
-              await checkBulk(bulk, substream.path, c8);
-            })
-            .on('error', (error) => {
-              console.log('Error processing ' + substream.path);
-              console.log(new Error(error));
-            });
-          }
-          else {
-            let parse = JSONStream.parse('timelineObjects.*');
-            let results = [];
-            substream.pipe(parse)
-            .on('data', async (data) => {
-              let template = {
-                "ecs": {
-                  "version": "1.6.0"
-                },
+            }
+            if (as && as.parkingEvent) {
+              let e = as.parkingEvent;
+              let el = e.location;
+              let start = moment(Number(e.timestampMs));
+              let values = Object.assign(Object.assign({}, template), {
+                "@timestamp": start.format(),
                 "event": {
-                  "created": substream.mtime,
-                  "dataset": "google.location",
-                  "ingested": new Date(),
-                  "kind": "event",
-                  "module": "Takeout",
+                  "original": JSON.stringify(e),
+                  "start": start.format(),
+                },
+                "time_slice": time2slice(start),
+                "time_details": time2details(start),
+                "position": {
+                  "geo": {
+                    "location": el.latitudeE7/1E7+','+el.longitudeE7/1E7,
+                  },
+                  "accuracy": el.accuracyMetres
+                }
+              });
+              let meta = {
+                index: {
+                  _index: c8.type(adapter.types[4].name)._index,
+                  _id: values["@timestamp"]
                 }
               };
-
-              let as = data.activitySegment;
-              let pv = data.placeVisit;
-              if (as) {
-                let s = Number(as.duration.startTimestampMs);
-                let e = Number(as.duration.endTimestampMs);
-                let start = moment(s);
-                let end = moment(e);
-                let duration = (e - s) * 1E6;
-                let sl = as.startLocation;
-                let el = as.endLocation;
-                
-                let values = Object.assign(Object.assign({}, template), {
-                  "@timestamp": start.format(),
-                  "event": {
-                    "end": end.format(),
-                    "duration": duration,
-                    "original": JSON.stringify(as),
-                    "start": start.format(),
-                  },
-                  "time_slice": time2slice(start),
-                  "date_details": time2details(start),
-                  "activity_segment": {
-                    "start": {
-                      "sourceInfo": sl.sourceInfo
-                    },
-                    "end": {
-                      "sourceInfo": el.sourceInfo
-                    },
-                    "distance": as.distance,
-                    "confidence": as.confidence,
-                    "activities": as.activities,
-                    "waypoints": as.waypoints,
-                    "editConfirmationStatus": as.editConfirmationStatus
-                  }
-                });
-                if (sl.latitudeE7) {
-                  values.activity_segment.start.geo = {
-                    "location": sl.latitudeE7/1E7+','+sl.longitudeE7/1E7,
-                  };
-                  values.position = {
-                    "geo": {
-                      "location": sl.latitudeE7/1E7+','+sl.longitudeE7/1E7
-                    }
-                  };
-                }
-                if (el.latitudeE7) {
-                  values.activity_segment.end.geo = {
-                    "location": el.latitudeE7/1E7+','+el.longitudeE7/1E7,
-                  };
-                }
-                let meta = {
-                  index: {
-                    _index: c8.type(adapter.types[2].name)._index,
-                    _id: values["@timestamp"] + '-activitysegment'
+              bulk.push(meta);
+              bulk.push(values);
+              await checkBulk(bulk, substream.path, c8, parse);
+            }
+            if (pv) {
+              let p = false;
+              let s = Number(pv.duration.startTimestampMs);
+              let e = Number(pv.duration.endTimestampMs);
+              let start = moment(s);
+              let end = moment(e);
+              let duration = (e - s) * 1E6;
+              let l = pv.location;
+              if (l.latitudeE7) {
+                p = {
+                  "geo": {
+                    "location": l.latitudeE7/1E7+','+l.longitudeE7/1E7
                   }
                 };
-                bulk.push(meta);
-                bulk.push(values);
-                await checkBulk(bulk, substream.path, c8, parse);
+                delete(l.latitudeE7);
+                delete(l.longitudeE7);
               }
-              if (as && as.parkingEvent) {
-                let e = as.parkingEvent;
-                let el = e.location;
-                let start = moment(Number(e.timestampMs));
-                let values = Object.assign(Object.assign({}, template), {
-                  "@timestamp": start.format(),
-                  "event": {
-                    "original": JSON.stringify(e),
-                    "start": start.format(),
+              l.placeConfidence = pv.placeConfidence;
+              l.visitConfidence = pv.visitConfidence;
+              if (pv.centerLatE7) {
+                l.center = {
+                  "geo": {
+                    "location": pv.centerLatE7/1E7+','+pv.centerLngE7/1E7
                   },
-                  "time_slice": time2slice(start),
-                  "time_details": time2details(start),
-                  "position": {
-                    "geo": {
-                      "location": el.latitudeE7/1E7+','+el.longitudeE7/1E7,
-                    },
-                    "accuracy": el.accuracyMetres
-                  }
-                });
-                let meta = {
-                  index: {
-                    _index: c8.type(adapter.types[4].name)._index,
-                    _id: values["@timestamp"]
-                  }
-                };
-                bulk.push(meta);
-                bulk.push(values);
-                await checkBulk(bulk, substream.path, c8, parse);
-              }
-              if (pv) {
-                let p = false;
-                let s = Number(pv.duration.startTimestampMs);
-                let e = Number(pv.duration.endTimestampMs);
-                let start = moment(s);
-                let end = moment(e);
-                let duration = (e - s) * 1E6;
-                let l = pv.location;
-                if (l.latitudeE7) {
-                  p = {
-                    "geo": {
-                      "location": l.latitudeE7/1E7+','+l.longitudeE7/1E7
-                    }
-                  };
-                  delete(l.latitudeE7);
-                  delete(l.longitudeE7);
                 }
-                l.placeConfidence = pv.placeConfidence;
-                l.visitConfidence = pv.visitConfidence;
-                if (pv.centerLatE7) {
-                  l.center = {
-                    "geo": {
-                      "location": pv.centerLatE7/1E7+','+pv.centerLngE7/1E7
-                    },
-                  }
+              }
+              l.otherCandidateLocations = pv.otherCandidateLocations;
+              l.editConfirmationStatus = pv.editConfirmationStatus;
+              let values = Object.assign(template, {
+                "@timestamp": start.format(),
+                "event": {
+                  "end": end.format(),
+                  "duration": duration,
+                  "original": JSON.stringify(as),
+                  "start": start.format(),
+                },
+                "time_slice": time2slice(start),
+                "date_details": time2details(start),
+                "place_visit": l
+              });
+              if (p) {
+                values.position = p;
+              }
+              let meta = {
+                index: {
+                  _index: c8.type(adapter.types[2].name)._index,
+                  _id: values["@timestamp"] + '-placevisit'
                 }
-                l.otherCandidateLocations = pv.otherCandidateLocations;
-                l.editConfirmationStatus = pv.editConfirmationStatus;
-                let values = Object.assign(template, {
-                  "@timestamp": start.format(),
-                  "event": {
-                    "end": end.format(),
-                    "duration": duration,
-                    "original": JSON.stringify(as),
-                    "start": start.format(),
-                  },
-                  "time_slice": time2slice(start),
-                  "date_details": time2details(start),
-                  "place_visit": l
-                });
-                if (p) {
-                  values.position = p;
-                }
-                let meta = {
-                  index: {
-                    _index: c8.type(adapter.types[2].name)._index,
-                    _id: values["@timestamp"] + '-placevisit'
-                  }
-                };
-                bulk.push(meta);
-                bulk.push(values);
-                await checkBulk(bulk, substream.path, c8, parse);
-              }
-            })
-            .on('end', async () => {
-              // console.log('Last batch of ' + substream.path + '!');
-              await checkBulk(bulk, substream.path, c8);
-            })
-            .on('error', (error) => {
-              console.log('Error processing ' + substream.path);
-              throw new Error(error);
-            });
-          }
-        })
-        .on('end', () => {
-          if (finishedBatches > 0) {
-            var updateParams = {
-              auth: oauth2Client,
-              fileId: file.id,
-              addParents: conf.outputDir,
-              removeParents: conf.inputDir,
-              fields: 'id, parents'
-            };
-            drive.files.update(updateParams, (err, updated) => {
-              if(err) {
-                throw new Error(err);
-                return;
-              }
-              else {
-                fulfill('Moved ' + file.name + ' from ' + conf.inputDir + ' to ' + conf.outputDir);
-              }
-            });
-          }
-          else {
-            fulfill('No location history in ' + file.name);
-          }
-        })
-        .on('error', err => {
-          throw new Error(err);
-        });
-      }
-      console.log('Found ' + files.length + ' file ' + (files.length == 1 ? '' : 's') + ' in ' + conf.inputDir);
+              };
+              bulk.push(meta);
+              bulk.push(values);
+              await checkBulk(bulk, substream.path, c8, parse);
+            }
+          })
+          .on('end', async () => {
+            // console.log('Last batch of ' + substream.path + '!');
+            await checkBulk(bulk, substream.path, c8);
+          })
+          .on('error', (error) => {
+            console.log('Error processing ' + substream.path);
+            throw new Error(error);
+          });
+        }
+      })
+      .on('end', () => {
+        if (finishedBatches > 0) {
+          var updateParams = {
+            auth: oauth2Client,
+            fileId: file.id,
+            addParents: conf.outputDir,
+            removeParents: conf.inputDir,
+            fields: 'id, parents'
+          };
+          drive.files.update(updateParams, (err, updated) => {
+            if(err) {
+              throw new Error(err);
+              return;
+            }
+            else {
+              fulfill('Moved ' + file.name + ' from ' + conf.inputDir + ' to ' + conf.outputDir);
+            }
+          });
+        }
+        else {
+          fulfill('No location history in ' + file.name);
+        }
+      })
+      .on('error', err => {
+        throw new Error(err);
+      });
     }
-  });
-  });
+    console.log('Found ' + files.length + ' file ' + (files.length == 1 ? '' : 's') + ' in ' + conf.inputDir);
+  }
 };
 
 async function checkBulk(bulk, filename, c8, parse=null) {
