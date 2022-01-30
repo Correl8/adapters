@@ -1,9 +1,9 @@
-var LastfmAPI = require('lastfmapi');
+const LastfmAPI = require('lastfmapi');
 
-var MS_IN_DAY = 24 * 60 * 60 * 1000;
-var MAX_DAYS = 365;
+const MS_IN_DAY = 24 * 60 * 60 * 1000;
+const MAX_DAYS = 365;
 
-var adapter = {};
+const adapter = {};
 
 adapter.sensorName = 'lastfm';
 
@@ -47,19 +47,19 @@ adapter.storeConfig = function(c8, result) {
 adapter.importData = function(c8, conf, opts) {
   return new Promise(function (fulfill, reject){
     console.log('Getting first date...');
-    var lfm = new LastfmAPI({
+    const lfm = new LastfmAPI({
       'api_key' : conf.clientId,
       'secret' : conf.clientSecret
     });
-    var firstDate, lastDate;
+    let firstDate, lastDate;
     return c8.type(adapter.types[0].name).search({
       _source: ['timestamp'],
       size: 1,
       sort: [{'timestamp': 'desc'}],
     }).then(function(response) {
-      var resp = c8.trimResults(response);
-      var firstDate = new Date();
-      var lastDate = opts.lastDate || new Date();;
+      const resp = c8.trimResults(response);
+      firstDate = new Date();
+      lastDate = opts.lastDate || new Date();;
       if (opts.firstDate) {
         firstDate = new Date(opts.firstDate);
         console.log('Setting first time to ' + firstDate);
