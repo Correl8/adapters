@@ -1,9 +1,9 @@
-const // withings = require('withings'),
-moment = require('moment'),
-express = require('express'),
-url = require('url'),
-rp = require('request-promise');
-const { v4: uuidv4 } = require('uuid/');
+// const withings = require('withings'),
+const moment = require('moment');
+// const express = require('express'), // required later only when used
+const url = require('url');
+const rp = require('request-promise');
+const { v4: uuidv4 } = require('uuid');
 
 var MAX_DAYS = 7;
 var MS_IN_DAY = 24 * 60 * 60 * 1000;
@@ -183,169 +183,165 @@ adapter.storeConfig = async (c8, gotConfig) => {
   });
 };
 
-adapter.importData = (c8, conf, opts) => {
-  return new Promise(async (fulfill, reject) => {
-    try {
-      console.log('Getting first date...');
-      const response = await c8.index(measureIndex).search({
-        _source: ['withings.updatetime'],
-        // _source: ['@timestamp'],
-        size: 1,
-        sort: [{'withings.updatetime': 'desc'}],
-        // sort: [{'@timestamp': 'desc'}],
-      });
-      const resp = c8.trimResults(response);
-      let firstDate = new Date();
-      let lastDate = opts.lastDate || new Date();
-      firstDate.setTime(lastDate.getTime() - (MAX_DAYS * MS_IN_DAY));
-      if (opts.firstDate) {
-        firstDate = new Date(opts.firstDate);
-        console.log('Setting first time to ' + firstDate);
-      }
-/*
+adapter.importData = async (c8, conf, opts) => {
+  try {
+    console.log('Getting first date...');
+    const response = await c8.index(measureIndex).search({
+      _source: ['withings.updatetime'],
+      // _source: ['@timestamp'],
+      size: 1,
+      sort: [{'withings.updatetime': 'desc'}],
+      // sort: [{'@timestamp': 'desc'}],
+    });
+    const resp = c8.trimResults(response);
+    let firstDate = new Date();
+    let lastDate = opts.lastDate || new Date();
+    firstDate.setTime(lastDate.getTime() - (MAX_DAYS * MS_IN_DAY));
+    if (opts.firstDate) {
+      firstDate = new Date(opts.firstDate);
+      console.log('Setting first time to ' + firstDate);
+    }
+    /*
       else if (resp && resp['@timestamp']) { // temp, for re-indexing
-        firstDate = new Date(resp['@timestamp']);
-        firstDate.setTime(firstDate.getTime() + 1000);
-        console.log('Setting first time to ' + firstDate);
+      firstDate = new Date(resp['@timestamp']);
+      firstDate.setTime(firstDate.getTime() + 1000);
+      console.log('Setting first time to ' + firstDate);
       }
-*/
-      else if (resp && resp.withings && resp.withings.updatetime) {
-        firstDate = new Date(resp.withings.updatetime);
-        console.log('Setting first time to ' + firstDate);
-      }
-      else {
-        console.log("No first time set!");
-      }
-      if (lastDate.getTime() > (firstDate.getTime() + MAX_DAYS * MS_IN_DAY)) {
-        lastDate.setTime(firstDate.getTime() + MAX_DAYS * MS_IN_DAY);
-        console.warn('Setting last date to ' + lastDate);
-      }
-      const step3 = {
-        method: 'POST',
-        uri: baseUrl + '/oauth2/token',
-        form: {
-          grant_type: 'refresh_token',
-          client_id: conf.clientId,
-          client_secret: conf.clientSecret,
-          refresh_token: conf.refresh_token
-        }
-      };
-      const tokenBody = await rp(step3);
-      Object.assign(conf, JSON.parse(tokenBody));
-      await c8.config(conf);
-      let messages = [];
-      messages.push(await importMeasures(c8, conf, firstDate, lastDate));
-      fulfill(messages.length + ' dataset' + (messages.length == 1 ? '' : 's') + '.\n' + messages.join('\n'));
+    */
+    else if (resp && resp.withings && resp.withings.updatetime) {
+      firstDate = new Date(resp.withings.updatetime);
+      console.log('Setting first time to ' + firstDate);
     }
-    catch(e) {
-      reject(new Error(e));
+    else {
+      console.log("No first time set!");
     }
-  });
+    if (lastDate.getTime() > (firstDate.getTime() + MAX_DAYS * MS_IN_DAY)) {
+      lastDate.setTime(firstDate.getTime() + MAX_DAYS * MS_IN_DAY);
+      console.warn('Setting last date to ' + lastDate);
+    }
+    const step3 = {
+      method: 'POST',
+      uri: baseUrl + '/oauth2/token',
+      form: {
+        grant_type: 'refresh_token',
+        client_id: conf.clientId,
+        client_secret: conf.clientSecret,
+        refresh_token: conf.refresh_token
+      }
+    };
+    const tokenBody = await rp(step3);
+    Object.assign(conf, JSON.parse(tokenBody));
+    await c8.config(conf);
+    let messages = [];
+    messages.push(await importMeasures(c8, conf, firstDate, lastDate));
+    return messages.length + ' dataset' + (messages.length == 1 ? '' : 's') + '.\n' + messages.join('\n');
+  }
+  catch(e) {
+    throw (new Error(e));
+  }
 };
 
-function importMeasures(c8, conf, firstDate, lastDate) {
-  return new Promise(async (fulfill, reject) => {
-    try {
-      const step4 = {
-        method: 'GET',
-        uri: apiBase + 'measure',
-        form: {
-          action: 'getmeas',
-          // get both real measures and objectives
-          // category: 1,
+async function importMeasures(c8, conf, firstDate, lastDate) {
+  try {
+    const step4 = {
+      method: 'GET',
+      uri: apiBase + 'measure',
+      form: {
+        action: 'getmeas',
+        // get both real measures and objectives
+        // category: 1,
+      },
+      headers: {
+        Authorization: 'Bearer ' + conf.access_token
+      }
+    };
+    if (firstDate) {
+      step4.form.lastupdate = moment(firstDate).format(dateFormat);
+    }
+    const body = await rp(step4);
+    let obj = JSON.parse(body);
+    // console.log(obj);
+    let ts = moment(obj.body.updatetime * 1000);
+    let bulk = [];
+    obj.body.measuregrps.forEach((grp) => {
+      // console.log(grp);
+      let d = moment(grp.date * 1000);
+      let id = grp.date + '-' + grp.grpid + '-' + grp.category;
+      let slice = time2slice(d);
+      let data = {
+        "@timestamp": d.format(),
+        "ecs": {
+          "version": "1.6.0"
         },
-        headers: {
-          Authorization: 'Bearer ' + conf.access_token
+        "event": {
+          "created": grp.created * 1000,
+          "dataset": "withings.measure",
+          "ingested": new Date(),
+          "kind": "metric",
+          "module": "withings",
+          "original": JSON.stringify(grp),
+          "start": d.format(),
+        },
+        "date_details": {
+          "year": parseInt(d.format('YYYY')),
+          "month": {
+            "number": parseInt(d.format('M')),
+            "name": d.format('MMMM'),
+          },
+          "week_number": parseInt(d.format('W')),
+          "day_of_year": parseInt(d.format('DDD')),
+          "day_of_month": parseInt(d.format('D')),
+          "day_of_week": {
+            "number": parseInt(d.format('d')),
+            "name": d.format('dddd'),
+          }
+        },
+        "time_slice": slice,
+        "withings": {
+          "updatetime": ts,
+          "group_id": grp.id,
+          "category": grp.category,
+          "measures": grp.measures
         }
       };
-      if (firstDate) {
-        step4.form.lastupdate = moment(firstDate).format(dateFormat);
+      if (grp.comment) {
+        data.withings.comment = grp.comment;
       }
-      const body = await rp(step4);
-      let obj = JSON.parse(body);
-      // console.log(obj);
-      let ts = moment(obj.body.updatetime * 1000);
-      let bulk = [];
-      obj.body.measuregrps.forEach((grp) => {
-        // console.log(grp);
-        let d = moment(grp.date * 1000);
-        let id = grp.date + '-' + grp.grpid + '-' + grp.category;
-        let slice = time2slice(d);
-        let data = {
-          "@timestamp": d.format(),
-          "ecs": {
-            "version": "1.6.0"
-          },
-          "event": {
-            "created": grp.created * 1000,
-            "dataset": "withings.measure",
-            "ingested": new Date(),
-            "kind": "metric",
-            "module": "withings",
-            "original": JSON.stringify(grp),
-            "start": d.format(),
-          },
-          "date_details": {
-            "year": parseInt(d.format('YYYY')),
-            "month": {
-              "number": parseInt(d.format('M')),
-              "name": d.format('MMMM'),
-            },
-            "week_number": parseInt(d.format('W')),
-            "day_of_year": parseInt(d.format('DDD')),
-            "day_of_month": parseInt(d.format('D')),
-            "day_of_week": {
-              "number": parseInt(d.format('d')),
-              "name": d.format('dddd'),
-            }
-          },
-          "time_slice": slice,
-          "withings": {
-            "updatetime": ts,
-            "group_id": grp.id,
-            "category": grp.category,
-            "measures": grp.measures
-          }
-        };
-        if (grp.comment) {
-          data.withings.comment = grp.comment;
-        }
-        // console.log(data);
-        grp.measures.forEach((m) => {
-          let t = m.type;
-          let v = m.value;
-          let u = m.unit;
-          let realValue = v * Math.pow(10, u);
-          data.withings[measTypes[t].name] = realValue;
-        });
-        bulk.push({index: {_index: c8._index, _id: id}});
-        bulk.push(data);
-        console.log('Measures: ' + d.format());
+      // console.log(data);
+      grp.measures.forEach((m) => {
+        let t = m.type;
+        let v = m.value;
+        let u = m.unit;
+        let realValue = v * Math.pow(10, u);
+        data.withings[measTypes[t].name] = realValue;
       });
-      if (bulk.length > 0) {
-        // console.log(JSON.stringify(bulk, null, 1));
-        // return;
-        const response = await c8.bulk(bulk);
-        const result = c8.trimBulkResults(response);
-        if (result.errors) {
-          var messages = [];
-          for (var i=0; i<result.items.length; i++) {
-            if (result.items[i].index.error) {
-              messages.push(i + ': ' + result.items[i].index.error.reason);
-            }
+      bulk.push({index: {_index: c8._index, _id: id}});
+      bulk.push(data);
+      console.log('Measures: ' + d.format());
+    });
+    if (bulk.length > 0) {
+      // console.log(JSON.stringify(bulk, null, 1));
+      // return;
+      const response = await c8.bulk(bulk);
+      const result = c8.trimBulkResults(response);
+      if (result.errors) {
+        var messages = [];
+        for (var i=0; i<result.items.length; i++) {
+          if (result.items[i].index.error) {
+            messages.push(i + ': ' + result.items[i].index.error.reason);
           }
-          reject(new Error(messages.length + ' errors in bulk insert:\n ' + messages.join('\n ')));
         }
-        fulfill('Indexed ' + result.items.length + ' measure group' + (result.items.length == 1 ? '' : 's')+ ' in ' + result.took + ' ms.');
+        throw(new Error(messages.length + ' errors in bulk insert:\n ' + messages.join('\n ')));
       }
-      else {
-        fulfill('No measures to import');
-      }
+      return 'Indexed ' + result.items.length + ' measure group' + (result.items.length == 1 ? '' : 's')+ ' in ' + result.took + ' ms.';
     }
-    catch (e) {
-      reject(new Error(e));
+    else {
+      return 'No measures to import';
     }
-  });
+  }
+  catch (e) {
+    throw(new Error(e));
+  }
 }
 
 function time2slice(t) {
