@@ -1,9 +1,9 @@
-const // withings = require('withings'),
-moment = require('moment'),
-express = require('express'),
-url = require('url'),
-rp = require('request-promise');
-const { v4: uuidv4 } = require('uuid/');
+// const withings = require('withings'),
+const moment = require('moment');
+// const express = require('express'), // required later only when used
+const url = require('url');
+const rp = require('request-promise');
+const { v4: uuidv4 } = require('uuid');
 
 const MAX_DAYS = 7;
 const MS_IN_DAY = 24 * 60 * 60 * 1000;
