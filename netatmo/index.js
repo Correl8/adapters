@@ -244,7 +244,7 @@ function prepareECS(obj) {
   }
   const t = moment(obj.dashboard_data.time_utc);
   return {
-    "id": t.format() + '-' + obj._id,
+    "_id": t.format() + '-' + obj._id,
     "@timestamp": t.format(),
     "ecs": {
       "version": "1.0.1"
