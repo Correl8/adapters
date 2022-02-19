@@ -15,7 +15,8 @@ const states = ['awake', 'light', 'deep', 'REM'];
 const redirectUri = 'https://correl8.me/authcallback';
 const authPort = 4343;
 
-const baseUrl = 'https://account.withings.com';
+const accountUrl = 'https://account.withings.com';
+const apiBase = 'https://wbsapi.withings.net';
 const dateFormat = 'X';
 const ymdFormat = 'YYYY-MM-DD';
 
@@ -209,7 +210,7 @@ adapter.promptProps = {
 
 adapter.storeConfig = async (c8, gotConfig) => {
   var conf = gotConfig;
-  conf.url = url.parse(baseUrl);
+  conf.url = url.parse(accountUrl);
   // const configPromise = c8.config(conf);
   // await configPromise;
   const defaultUrl = url.parse(conf.redirectUri);
@@ -247,12 +248,13 @@ adapter.storeConfig = async (c8, gotConfig) => {
         console.log('Got Authorization Code, requesting Access Token');
         const step2 = {
           method: 'POST',
-          uri: baseUrl + '/oauth2/token',
+          uri: apiBase + '/v2/oauth2',
           form: {
-            grant_type: 'authorization_code',
+            action: 'requesttoken',
             client_id: conf.clientId,
             client_secret: conf.clientSecret,
             code: conf.code,
+            grant_type: 'authorization_code',
             redirect_uri: conf.redirectUri
           }
         };
@@ -307,16 +309,17 @@ adapter.importData = (c8, conf, opts) => {
       }
       const step3 = {
         method: 'POST',
-        uri: baseUrl + '/oauth2/token',
+        uri: apiBase + '/v2/oauth2',
         form: {
-          grant_type: 'refresh_token',
+          action: 'requesttoken',
           client_id: conf.clientId,
           client_secret: conf.clientSecret,
+          grant_type: 'refresh_token',
           refresh_token: conf.refresh_token
         }
       };
-      const tokenBody = await rp(step3);
-      Object.assign(conf, JSON.parse(tokenBody));
+      const tokenBody = JSON.parse(await rp(step3));
+      Object.assign(conf, tokenBody.body);
       await c8.config(conf);
       let messages = [];
       messages.push(await importSleepSummary(c8, conf, firstDate, lastDate));
@@ -335,7 +338,7 @@ function importSleepSummary(c8, conf, firstDate, lastDate) {
     try {
       const step4 = {
         method: 'GET',
-        uri: 'https://wbsapi.withings.net/v2/sleep',
+        uri: apiBase + '/v2/sleep',
         form: {
           action: 'getsummary',
           data_fields: Object.keys(adapter.types[2].fields.withings.data).join(',')

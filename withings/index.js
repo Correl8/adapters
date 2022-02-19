@@ -29,8 +29,10 @@ measTypes[91] = {name: 'Pulse Wave Velocity', unit: 'm/s'};
 const redirectUri = 'https://correl8.me/authcallback';
 const authPort = 4343;
 
-const baseUrl = 'https://account.withings.com';
+// const baseUrl = 'https://account.withings.com';
+// const baseUrl = 'https://wbsapi.us.withingsmed.net';
 const apiBase = 'https://wbsapi.withings.net/';
+const accountUrl = 'https://account.withings.com';
 const dateFormat = 'X';
 
 let adapter = {};
@@ -119,7 +121,7 @@ adapter.promptProps = {
 
 adapter.storeConfig = async (c8, gotConfig) => {
   var conf = gotConfig;
-  conf.url = url.parse(baseUrl);
+  conf.url = url.parse(accountUrl);
   // const configPromise = c8.config(conf);
   // await configPromise;
   const defaultUrl = url.parse(conf.redirectUri);
@@ -157,17 +159,22 @@ adapter.storeConfig = async (c8, gotConfig) => {
         console.log('Got Authorization Code, requesting Access Token');
         const step2 = {
           method: 'POST',
-          uri: baseUrl + '/oauth2/token',
+          // uri: baseUrl + '/oauth2/token',
+          uri: apiBase + '/v2/oauth2',
           form: {
-            grant_type: 'authorization_code',
+            action: 'requesttoken',
             client_id: conf.clientId,
             client_secret: conf.clientSecret,
+            grant_type: 'authorization_code',
             code: conf.code,
             redirect_uri: conf.redirectUri
           }
         };
-        const tokenBody = await rp(step2);
-        Object.assign(conf, JSON.parse(tokenBody));
+        const tokenBody = JSON.parse(await rp(step2));
+        if (!tokenBody.body) {
+          throw new Error('Failed to get access token: ' + tokenBody.status);
+        }
+        Object.assign(conf, tokenBody.body);
         server.close();
         await c8.config(conf);
         res.send('Access token saved.');
@@ -221,16 +228,17 @@ adapter.importData = async (c8, conf, opts) => {
     }
     const step3 = {
       method: 'POST',
-      uri: baseUrl + '/oauth2/token',
+      uri: apiBase + '/v2/oauth2',
       form: {
-        grant_type: 'refresh_token',
+        action: 'requesttoken',
         client_id: conf.clientId,
         client_secret: conf.clientSecret,
+        grant_type: 'refresh_token',
         refresh_token: conf.refresh_token
       }
     };
-    const tokenBody = await rp(step3);
-    Object.assign(conf, JSON.parse(tokenBody));
+    const tokenBody = JSON.parse(await rp(step3));
+    Object.assign(conf, tokenBody.body);
     await c8.config(conf);
     let messages = [];
     messages.push(await importMeasures(c8, conf, firstDate, lastDate));
