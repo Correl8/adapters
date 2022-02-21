@@ -9,7 +9,7 @@ const { v4: uuidv4 } = require('uuid');
 const redirectUri = 'https://correl8.me/authcallback';
 const authPort = 4343;
 
-const MAX_DAYS = 30;
+const MAX_DAYS = 1;
 const MS_IN_DAY = 24 * 60 * 60 * 1000;
 const dateFormat = 'YYYY-MM-DD'
 
@@ -41,6 +41,13 @@ const sleepHRIndex = 'oura-sleep-hr';
 const sleepHRVIndex = 'oura-sleep-rmssd';
 const activityClassIndex = 'oura-activity-class';
 const activityMETIndex = 'oura-activity-met';
+const heartrateIndex = 'oura-hr';
+const sessionIndex = 'oura-session';
+const sessionHRIndex = 'oura-session-hr';
+const sessionHRVIndex = 'oura-session-hrv';
+const sessionMotionIndex = 'oura-session-motion';
+const tagIndex = 'oura-tag';
+const workoutIndex = 'oura-workout';
 
 adapter.types = [
   {
@@ -426,6 +433,286 @@ adapter.types = [
       }
     }
   },
+  {
+    name: heartrateIndex,
+    fields: {
+      "@timestamp": "date",
+      "event": {
+        "created": "date",
+        "dataset": "keyword",
+        "duration": "long",
+        "end": "date",
+        "module": "keyword",
+        "original": "keyword",
+        "start": "date",
+        "timezone": "keyword"
+      },
+      "date_details": {
+        "year": 'long',
+        "month": {
+          "number": 'long',
+          "name": 'keyword',
+        },
+        "week_number": 'long',
+        "day_of_year": 'long',
+        "day_of_month": 'long',
+        "day_of_week": {
+          "number": 'long',
+          "name": 'keyword',
+        }
+      },
+      "time_slice": {
+        "start_hour": 'long',
+        "id": 'long',
+        "name": 'keyword',
+      },
+      "hr": {
+        "bpm": "float",
+        "source": "keyword"
+      }
+    }
+  },
+  {
+    name: sessionIndex,
+    fields: {
+      "@timestamp": "date",
+      "event": {
+        "created": "date",
+        "dataset": "keyword",
+        "duration": "long",
+        "end": "date",
+        "module": "keyword",
+        "original": "keyword",
+        "start": "date",
+        "timezone": "keyword"
+      },
+      "date_details": {
+        "year": 'long',
+        "month": {
+          "number": 'long',
+          "name": 'keyword',
+        },
+        "week_number": 'long',
+        "day_of_year": 'long',
+        "day_of_month": 'long',
+        "day_of_week": {
+          "number": 'long',
+          "name": 'keyword',
+        }
+      },
+      "time_slice": {
+        "start_hour": 'long',
+        "id": 'long',
+        "name": 'keyword',
+      },
+      "session": {
+        "day": "date",
+        "start_datetime": "date",
+        "end_datetime": "date",
+        "type": "keyword",
+        "mood": "keyword",
+      }
+    }
+  },
+  {
+    name: sessionHRIndex,
+    fields: {
+      "@timestamp": "date",
+      "event": {
+        "created": "date",
+        "dataset": "keyword",
+        "duration": "long",
+        "end": "date",
+        "module": "keyword",
+        "original": "keyword",
+        "start": "date",
+        "timezone": "keyword"
+      },
+      "date_details": {
+        "year": 'long',
+        "month": {
+          "number": 'long',
+          "name": 'keyword',
+        },
+        "week_number": 'long',
+        "day_of_year": 'long',
+        "day_of_month": 'long',
+        "day_of_week": {
+          "number": 'long',
+          "name": 'keyword',
+        }
+      },
+      "time_slice": {
+        "start_hour": 'long',
+        "id": 'long',
+        "name": 'keyword',
+      },
+      "session": {
+        "hr": "float",
+      }
+    }
+  },
+  {
+    name: sessionHRVIndex,
+    fields: {
+      "@timestamp": "date",
+      "event": {
+        "created": "date",
+        "dataset": "keyword",
+        "duration": "long",
+        "end": "date",
+        "module": "keyword",
+        "original": "keyword",
+        "start": "date",
+        "timezone": "keyword"
+      },
+      "date_details": {
+        "year": 'long',
+        "month": {
+          "number": 'long',
+          "name": 'keyword',
+        },
+        "week_number": 'long',
+        "day_of_year": 'long',
+        "day_of_month": 'long',
+        "day_of_week": {
+          "number": 'long',
+          "name": 'keyword',
+        }
+      },
+      "time_slice": {
+        "start_hour": 'long',
+        "id": 'long',
+        "name": 'keyword',
+      },
+      "session": {
+        "rmssd": "float",
+      }
+    }
+  },
+  {
+    name: sessionMotionIndex,
+    fields: {
+      "@timestamp": "date",
+      "event": {
+        "created": "date",
+        "dataset": "keyword",
+        "duration": "long",
+        "end": "date",
+        "module": "keyword",
+        "original": "keyword",
+        "start": "date",
+        "timezone": "keyword"
+      },
+      "date_details": {
+        "year": 'long',
+        "month": {
+          "number": 'long',
+          "name": 'keyword',
+        },
+        "week_number": 'long',
+        "day_of_year": 'long',
+        "day_of_month": 'long',
+        "day_of_week": {
+          "number": 'long',
+          "name": 'keyword',
+        }
+      },
+      "time_slice": {
+        "start_hour": 'long',
+        "id": 'long',
+        "name": 'keyword',
+      },
+      "session": {
+        "motion_count": "float",
+      }
+    }
+  },
+  {
+    name: tagIndex,
+    fields: {
+      "@timestamp": "date",
+      "event": {
+        "created": "date",
+        "dataset": "keyword",
+        "duration": "long",
+        "end": "date",
+        "module": "keyword",
+        "original": "keyword",
+        "start": "date",
+        "timezone": "keyword"
+      },
+      "date_details": {
+        "year": 'long',
+        "month": {
+          "number": 'long',
+          "name": 'keyword',
+        },
+        "week_number": 'long',
+        "day_of_year": 'long',
+        "day_of_month": 'long',
+        "day_of_week": {
+          "number": 'long',
+          "name": 'keyword',
+        }
+      },
+      "time_slice": {
+        "start_hour": 'long',
+        "id": 'long',
+        "name": 'keyword',
+      },
+      "tag": {
+        "day": "date",
+        "text": "text",
+        "timestamp": "date",
+        "tags": "keyword"
+      }
+    }
+  },
+  {
+    name: workoutIndex,
+    fields: {
+      "@timestamp": "date",
+      "event": {
+        "created": "date",
+        "dataset": "keyword",
+        "duration": "long",
+        "end": "date",
+        "module": "keyword",
+        "original": "keyword",
+        "start": "date",
+        "timezone": "keyword"
+      },
+      "date_details": {
+        "year": 'long',
+        "month": {
+          "number": 'long',
+          "name": 'keyword',
+        },
+        "week_number": 'long',
+        "day_of_year": 'long',
+        "day_of_month": 'long',
+        "day_of_week": {
+          "number": 'long',
+          "name": 'keyword',
+        }
+      },
+      "time_slice": {
+        "start_hour": 'long',
+        "id": 'long',
+        "name": 'keyword',
+      },
+      "workout": {
+        "activity": "keyword",
+        "calories": "float",
+        "day": "date",
+        "distance": "float",
+        "intensity": "keyword",
+        "label": "keyword",
+        "source": "keyword",
+      }
+    }
+  },
 ];
 
 adapter.promptProps = {
@@ -482,48 +769,44 @@ adapter.storeConfig = async function(c8, result) {
   }
 };
 
-adapter.importData = function(c8, conf, opts) {
-  return new Promise(async function (fulfill, reject){
-    try {
-      let response = await c8.type(sleepSummaryIndex).search({
-        _source: ['@timestamp'],
-        size: 1,
-        sort: [{'@timestamp': 'desc'}],
-      });
-      console.log('Getting first date...');
-      response = await c8.search({
-        _source: ['@timestamp'],
-        size: 1,
-        sort: [{'@timestamp': 'desc'}],
-      });
-      const resp = c8.trimResults(response);
-      let firstDate = new Date();
-      let lastDate = opts.lastDate || new Date();
-      firstDate.setTime(lastDate.getTime() - (MAX_DAYS * MS_IN_DAY));
-      if (opts.firstDate) {
-        firstDate = new Date(opts.firstDate);
-        console.log('Setting first time to ' + firstDate);
-      }
-      else if (resp && resp["@timestamp"]) {
-        const d = new Date(resp["@timestamp"]);
-        firstDate.setTime(d.getTime() + 1);
-        console.log('Setting first time to ' + firstDate);
-      }
-      if (lastDate.getTime() > (firstDate.getTime() + MAX_DAYS * MS_IN_DAY)) {
-        lastDate.setTime(firstDate.getTime() + MAX_DAYS * MS_IN_DAY);
-        console.warn('Setting last date to ' + lastDate);
-      }
-      const message = importData(c8, conf, firstDate, lastDate);
-      fulfill(message);
+adapter.importData = async function(c8, conf, opts) {
+  try {
+    let response = await c8.type(sleepSummaryIndex).search({
+      _source: ['@timestamp'],
+      size: 1,
+      sort: [{'@timestamp': 'desc'}],
+    });
+    response = await c8.search({
+      _source: ['@timestamp'],
+      size: 1,
+      sort: [{'@timestamp': 'desc'}],
+    });
+    const resp = c8.trimResults(response);
+    let firstDate = new Date();
+    let lastDate = opts.lastDate || new Date();
+    firstDate.setTime(lastDate.getTime() - (MAX_DAYS * MS_IN_DAY));
+    if (opts.firstDate) {
+      firstDate = new Date(opts.firstDate);
+      console.log('Setting first time to ' + firstDate);
     }
-    catch (error) {
-      reject(error);
+    else if (resp && resp["@timestamp"]) {
+      const d = new Date(resp["@timestamp"]);
+      firstDate.setTime(d.getTime() + 1);
+      console.log('Setting first time to ' + firstDate);
     }
-  });
+    if (lastDate.getTime() > (firstDate.getTime() + MAX_DAYS * MS_IN_DAY)) {
+      lastDate.setTime(firstDate.getTime() + MAX_DAYS * MS_IN_DAY);
+      console.warn('Setting last date to ' + lastDate);
+    }
+    return importData(c8, conf, firstDate, lastDate);
+  }
+  catch (error) {
+    throw new Error(error.name + ': ' + error.message);
+  }
 }
 
-function importData(c8, conf, firstDate, lastDate) {
-  return new Promise(async function (fulfill, reject){
+async function importData(c8, conf, firstDate, lastDate) {
+  try {
     const options = {
       clientId: conf.client_id,
       clientSecret: conf.client_secret,
@@ -532,32 +815,33 @@ function importData(c8, conf, firstDate, lastDate) {
     const token = conf.access_token;
     const authClient = oura.Auth(options);
     const auth = authClient.createToken(conf.access_token, conf.refresh_token);
-    try {
-      let refreshed = await auth.refresh();
-      Object.assign(conf, refreshed.data);
-      await c8.config(conf);
-      const client = new oura.Client(conf.access_token);
-      if (!firstDate) {
-        // reject('No starting date...');
-        return;
-      }
-      let start = moment(firstDate).format(dateFormat);
-      let end = moment(lastDate).format(dateFormat);
-      const values = await Promise.all([
-        getSleep(c8, client, start, end),
-        getActivity(c8, client, start, end),
-        getReadiness(c8, client, start, end),
-      ]);
-      fulfill(values.join('\n'));
+    let refreshed = await auth.refresh();
+    Object.assign(conf, refreshed.data);
+    await c8.config(conf);
+    const client = new oura.Client(conf.access_token);
+    if (!firstDate) {
+      return;
     }
-    catch (error){
-      reject(error);
-    }
-  });
+    let start = moment(firstDate);
+    let end = moment(lastDate);
+    const values = await Promise.all([
+      getSleep(c8, client, start.format(dateFormat), end.format(dateFormat)),
+      getActivity(c8, client, start.format(dateFormat), end.format(dateFormat)),
+      getReadiness(c8, client, start.format(dateFormat), end.format(dateFormat)),
+      getHR(c8, client, start.format(), end.format()), // dateTime instead of date
+      getSessions(c8, client, start.format(dateFormat), end.format(dateFormat)),
+      getTags(c8, client, start.format(dateFormat), end.format(dateFormat)),
+      getWorkouts(c8, client, start.format(dateFormat), end.format(dateFormat)),
+    ]);
+    return values.join('\n');
+  }
+  catch (error){
+    throw new Error(error.name + ': ' + error.message);
+  }
 }
 
-function getSleep(c8, client, start, end) {
-  return new Promise(async function (fulfill, reject){
+async function getSleep(c8, client, start, end) {
+  try {
     let response = await client.sleep(start, end);
     let bulk = [];
     let obj = response.sleep;
@@ -653,6 +937,7 @@ function getSleep(c8, client, start, end) {
             // console.log('Skipping ' + d.format());
             continue;
           }
+          let id = d.format();
           let data = {
             "@timestamp": d.format(),
             "ecs": {
@@ -684,12 +969,13 @@ function getSleep(c8, client, start, end) {
               "sequence": j,
               "start": d.format(),
               "end": d.add(duration, 'seconds').format(),
+              "timezone": d.format('Z'),
             },
             "sleep": {
               "hr": sleepHRData[j]
             }
           };
-          bulk.push({index: {_index: c8.type(sleepHRIndex)._index, _id: d.format()}});
+          bulk.push({index: {_index: c8.type(sleepHRIndex)._index, _id: id}});
           bulk.push(data);
         }
       }
@@ -702,6 +988,7 @@ function getSleep(c8, client, start, end) {
             d.add(duration, 'seconds');
             continue;
           }
+          let id = d.format();
           let data = {
             "@timestamp": d.format(),
             "ecs": {
@@ -733,6 +1020,7 @@ function getSleep(c8, client, start, end) {
               "sequence": j,
               "start": d.format(),
               "end": d.add(duration, 'seconds').format(),
+              "timezone": d.format('Z'),
             },
             "sleep": {
               "hrv": {
@@ -740,7 +1028,7 @@ function getSleep(c8, client, start, end) {
               }
             }
           };
-          bulk.push({index: {_index: c8.type(sleepHRVIndex)._index, _id: d.format()}});
+          bulk.push({index: {_index: c8.type(sleepHRVIndex)._index, _id: id}});
           bulk.push(data);
         }
       }
@@ -748,6 +1036,7 @@ function getSleep(c8, client, start, end) {
         let d = moment(obj[i].bedtime_start);
         let duration = 5 * 60; // seconds
         for (var j=0; j<sleepStateData.length; j++) {
+          let id = d.format();
           let data = {
             "@timestamp": d.format(),
             "ecs": {
@@ -780,6 +1069,7 @@ function getSleep(c8, client, start, end) {
               "original": sleepStateData[j],
               "start": d.format(),
               "end": d.add(duration, 'seconds').format(),
+              "timezone": d.format('Z'),
             },
             "sleep": {
               "state": {
@@ -788,7 +1078,7 @@ function getSleep(c8, client, start, end) {
               }
             }
           };
-          bulk.push({index: {_index: c8.type(sleepStateIndex)._index, _id: d.format()}});
+          bulk.push({index: {_index: c8.type(sleepStateIndex)._index, _id: id}});
           bulk.push(data);
         }
       }
@@ -805,36 +1095,40 @@ function getSleep(c8, client, start, end) {
               messages.push(i + ': ' + result.items[i].index.error.reason);
             }
           }
-          reject(new Error(messages.length + ' errors in bulk insert:\n ' + messages.join('\n ')));
+          return messages.length + ' errors in bulk insert:\n ' + messages.join('\n ');
         }
         else if (!result) {
-          reject(new Error(result));
+          return 'Failed to index sleep data!';
         }
-        fulfill('Indexed ' + result.items.length + ' sleep documents in ' + result.took + ' ms.');
+        return 'Indexed ' + result.items.length + ' sleep documents in ' + result.took + ' ms.';
       }
       catch (error) {
-        reject(error);
         bulk = null;
+        throw new Error('Failed to index sleep data! ' + error.name + ': ' + error.message);
       }
     }
     else {
-      fulfill('No sleep to import');
+      return 'No sleep data to import';
     }
-  });
+  }
+  catch (error) {
+    bulk = null;
+    throw new Error('Failed to get sleep data! ' + error.name + ': ' + error.message);
+  }
 }
 
-function getActivity(c8, client, start, end) {
-  return new Promise(async function (fulfill, reject){
+async function getActivity(c8, client, start, end) {
+  try {
     let response = await client.activity(start, end);
-    let obj = response.activity;
+    let obj = response.data;
     let bulkResponses = [];
     for (var i=0; i<obj.length; i++) {
       let bulk = [];
       let activity = obj[i];
-      let startMoment = moment(activity.day_start);
-      let endMoment = moment(activity.day_end);
+      let startMoment = moment(activity.timestamp);
+      let endMoment = moment(startMoment).add(1, 'days').subtract(1, 'seconds');
       let data = {
-        "@timestamp": moment(activity.summary_date),
+        "@timestamp": endMoment,
         "ecs": {
           "version": "1.6.0"
         },
@@ -847,9 +1141,8 @@ function getActivity(c8, client, start, end) {
           "kind": "event",
           "module": "oura",
           "original": JSON.stringify(activity),
-          "sequence": activity.period_id,
           "start": startMoment.format(),
-          "timezone": mins2ts(activity.timezone)
+          "timezone": startMoment.format('Z')
         },
         "date_details": {
           "year": startMoment.format('YYYY'),
@@ -866,54 +1159,55 @@ function getActivity(c8, client, start, end) {
           }
         },
         "activity": {
-          "summary_date": activity.summary_date,
-          "period_id": activity.period_id,
-          "timezone": activity.timezone,
+          "summary_date": activity.day,
+          "period_id": i,
+          // "timezone": activity.timestamp,
           "day_start": startMoment.format(),
           "day_end": endMoment.format(),
           "score": {
             "value": activity.score,
-            "stay_active": activity.score_stay_active,
-            "move_every_hour": activity.score_move_every_hour,
-            "meet_daily_targets": activity.score_meet_daily_targets,
-            "training_frequency": activity.score_training_frequency,
-            "training_volume": activity.score_training_volume,
-            "recovery_time": activity.score_recovery_time,
+            "stay_active": activity.contributors.stay_active,
+            "move_every_hour": activity.contributors.move_every_hour,
+            "meet_daily_targets": activity.contributors.meet_daily_targets,
+            "training_frequency": activity.contributors.training_frequency,
+            "training_volume": activity.contributors.training_volume,
+            "recovery_time": activity.contributors.recovery_time,
           },
         },
-        "daily_movement_meters": activity.daily_movement,
-        "non_wear_minutes": activity.non_wear,
-        "rest_minutes": activity.rest,
-        "inactive_minutes": activity.inactive,
+        "daily_movement_meters": activity.equivalent_walking_distance,
+        "non_wear_minutes": Math.floor(activity.non_wear_time/60),
+        "rest_minutes": Math.floor(activity.resting_time/60),
+        "inactive_minutes": Math.floor(activity.sedentary_time/60),
         "inactivity_alerts": activity.inactivity_alerts,
-        "low_minutes": activity.low,
-        "medium_minutes": activity.medium,
-        "high_minutes": activity.high,
+        "low_minutes": activity.low_activity_met_minutes,
+        "medium_minutes": activity.medium_activity_met_minutes,
+        "high_minutes": activity.high_activity_met_minutes,
         "steps": activity.steps,
         "cal": {
-          "total": activity.cal_total,
-          "cal_active": activity.cal_active,
+          "total": activity.total_calories,
+          "cal_active": activity.active_calories,
         },
         "met": {
-          "min_inactive": activity.met_min_active,
-          "min_low": activity.met_min_low,
-          "min_medium_plus": activity.met_min_medium_plus,
-          "min_medium": activity.met_min_medium,
-          "min_high": activity.met_min_high,
-          "average": activity.average_met,
+          "min_inactive": activity.sedentary_met_minutes,
+          "min_low": activity.low_activity_met_minutes,
+          // "min_medium_plus": ,
+          "min_medium": activity.medium_activity_met_minutes,
+          "min_high": activity.high_activity_met_minutes,
+          "average": activity.average_met_minutes,
         }
       }
-      
-      let activityClassData = activity.class_5min.split("");
-      let activityMETData = activity.met_1min;
-      let id = activity.summary_date;
+      let activityClassData = activity.class_5_min.split("");
+      let activityMETData = activity.met.items;
+      let id = activity.day;
+      // let id = endMoment.format(dateFormat);
       console.log(id + ': activity score ' + activity.score);
       bulk.push({index: {_index: c8.type(activitySummaryIndex)._index, _id: id}});
       bulk.push(data);
       if (activityMETData && activityMETData.length) {
-        let d = moment(activity.summary_date).hour(4).minute(0).second(0).millisecond(0);
-        let duration = 60; // seconds
+        let d = moment(activity.met.timestamp);
+        let duration = activity.met.interval; // seconds
         for (var j=0; j<activityMETData.length; j++) {
+          let id = d.format();
           let data = {
             "@timestamp": d.format(),
             "ecs": {
@@ -945,6 +1239,7 @@ function getActivity(c8, client, start, end) {
               "sequence": j,
               "start": d.format(),
               "end": d.add(duration, 'seconds').format(),
+              "timezone": d.format('Z'),
             },
             "activity": {
               "met": {
@@ -952,14 +1247,15 @@ function getActivity(c8, client, start, end) {
               }
             }
           };
-          bulk.push({index: {_index: c8.type(activityMETIndex)._index, _id: d.format()}});
+          bulk.push({index: {_index: c8.type(activityMETIndex)._index, _id: id}});
           bulk.push(data);
         }
       }
       if (activityClassData && activityClassData.length) {
-        let d = moment(activity.summary_date).hour(4).minute(0).second(0).millisecond(0);
+        let d = moment(activity.timestamp);
         let duration = 5 * 60; // seconds
         for (var j=0; j<activityClassData.length; j++) {
+          let id = d.format();
           let data = {
             "@timestamp": d.format(),
             "ecs": {
@@ -991,6 +1287,7 @@ function getActivity(c8, client, start, end) {
               "sequence": j,
               "start": d.format(),
               "end": d.add(duration, 'seconds').format(),
+              "timezone": d.format('Z'),
             },
             "activity": {
               "class": {
@@ -999,7 +1296,7 @@ function getActivity(c8, client, start, end) {
               }
             }
           };
-          bulk.push({index: {_index: c8.type(activityClassIndex)._index, _id: d.format()}});
+          bulk.push({index: {_index: c8.type(activityClassIndex)._index, _id: id}});
           bulk.push(data);
         }
       }
@@ -1019,20 +1316,23 @@ function getActivity(c8, client, start, end) {
         totalTime += result.took;
       });
       if (totalDocuments == 0) {
-        fulfill('No activity to import');
+        return 'No activity to import';
       }
       else {
-        fulfill('Indexed ' + totalDocuments + ' activity documents in ' + totalTime + ' ms.');
+        return 'Indexed ' + totalDocuments + ' activity documents in ' + totalTime + ' ms.';
       }
     }
     catch (error) {
-      reject(error);
+      throw new Error('Failed to index activity data! ' + error.name + ': ' + error.message);
     }
-  });
+  }
+  catch (error) {
+    throw new Error('Failed to get activity data! ' + error.name + ': ' + error.message);
+  }
 }
 
-function getReadiness(c8, client, start, end) {
-  return new Promise(async function (fulfill, reject){
+async function getReadiness(c8, client, start, end) {
+  try {
     let response = await client.readiness(start, end);
     let bulk = [];
     let obj = response.readiness;
@@ -1044,17 +1344,6 @@ function getReadiness(c8, client, start, end) {
         "@timestamp": moment(readiness.summary_date).hour(4).add(1, 'days'),
         "ecs": {
           "version": "1.6.0"
-        },
-        "event": {
-          "created": endMoment.format(),
-          "dataset": "oura.readiness",
-          "ingested": new Date(),
-          "kind": "event",
-          "module": "oura",
-          "original": JSON.stringify(readiness),
-          "sequence": readiness.period_id,
-          "start": startMoment,
-          "end": endMoment,
         },
         "date_details": {
           "year": startMoment.format('YYYY'),
@@ -1069,6 +1358,19 @@ function getReadiness(c8, client, start, end) {
             "number": startMoment.format('d'),
             "name": startMoment.format('dddd'),
           }
+        },
+        "event": {
+          "created": endMoment.format(),
+          "dataset": "oura.readiness",
+          "duration": endMoment.diff(startMoment) * 1E6, // moment diff is milliseconds, want nanos
+          "ingested": new Date(),
+          "kind": "event",
+          "module": "oura",
+          "original": JSON.stringify(readiness),
+          "sequence": readiness.period_id,
+          "start": startMoment,
+          "end": endMoment,
+          "timezone": startMoment.format('Z'),
         },
         "readiness": {
           "summary_date": readiness.summary_date,
@@ -1094,17 +1396,456 @@ function getReadiness(c8, client, start, end) {
       try {
         let response = await c8.bulk(bulk);
         let result = c8.trimBulkResults(response);
-        fulfill('Indexed ' + result.items.length + ' readiness documents in ' + result.took + ' ms.');
+        return 'Indexed ' + result.items.length + ' readiness documents in ' + result.took + ' ms.';
       }
       catch (error) {
-        reject(error);
+        throw new Error('Failed to index readiness data! ' + error.name + ': ' + error.message);
       }
     }
     else {
-      fulfill('No readiness data to import');
+      return 'No readiness data to import';
     }
-  });
+  }
+  catch (error) {
+      throw new Error('Failed to get readiness data! ' + error.name + ': ' + error.message);
+  }
 }
+
+async function getHR(c8, client, start, end) {
+  try {
+    let response = await client.heartrate(start, end);
+    let obj = response.data;
+    let bulk = [];
+    for (var i=0; i<obj.length; i++) {
+      let hr = obj[i];
+      let startMoment = moment(hr.timestamp);
+      let data = {
+        "@timestamp": hr.timestamp,
+        "ecs": {
+          "version": "1.6.0"
+        },
+        "event": {
+          "created": startMoment.format(),
+          "dataset": "oura.heartrate",
+          "ingested": new Date(),
+          "kind": "metric",
+          "module": "oura",
+          "original": JSON.stringify(hr),
+          "start": startMoment.format(),
+          "timezone": startMoment.format('Z'),
+        },
+        "date_details": {
+          "year": startMoment.format('YYYY'),
+          "month": {
+            "number": startMoment.format('M'),
+            "name": startMoment.format('MMMM'),
+          },
+          "week_number": startMoment.format('W'),
+          "day_of_year": startMoment.format('DDD'),
+          "day_of_month": startMoment.format('D'),
+          "day_of_week": {
+            "number": startMoment.format('d'),
+            "name": startMoment.format('dddd'),
+          }
+        },
+        "hr": {
+          "bpm": hr.bpm,
+          "source": hr.source,
+        }
+      }
+      let id = hr.timestamp;
+      // console.log(id + ': HR ' + hr.bpm);
+      bulk.push({index: {_index: c8.type(heartrateIndex)._index, _id: id}});
+      bulk.push(data);
+    }
+    let totalDocuments = 0;
+    let totalTime = 0;
+    if (bulk.length > 0) {
+      try {
+        // console.log(bulk.length);
+        // console.log(JSON.stringify(bulk, null, 1));
+        const response = await c8.bulk(bulk);
+        let result = c8.trimBulkResults(response);
+        totalDocuments += result.items.length;
+        totalTime += result.took;
+      }
+      catch (error) {
+        throw new Error('Failed to index heartrate data! ' + error.name + ': ' + error.message);
+      }
+    }
+    if (totalDocuments == 0) {
+      return 'No heartrate to import';
+    }
+    else {
+      return 'Indexed ' + totalDocuments + ' heartrate documents in ' + totalTime + ' ms.';
+    }
+  }
+  catch (error) {
+    throw new Error('Failed to get heartrate data! ' + error.name + ': ' + error.message);
+  }
+}
+
+async function getSessions(c8, client, start, end) {
+  try {
+    let response = await client.session(start, end);
+    let obj = response.data;
+    let bulk = [];
+    for (var i=0; i<obj.length; i++) {
+      let session = obj[i];
+      let startMoment = moment(session.start_datetime);
+      let endMoment = moment(session.end_datetime);
+      let data = {
+        "@timestamp": session.start_datetime,
+        "ecs": {
+          "version": "1.6.0"
+        },
+        "event": {
+          "created": startMoment.format(),
+          "dataset": "oura.session",
+          "duration": endMoment.diff(startMoment) * 1E6, // moment diff is milliseconds, want nanos
+          "ingested": new Date(),
+          "kind": "event",
+          "module": "oura",
+          "original": JSON.stringify(session),
+          "sequence": readiness.period_id,
+          "start": startMoment,
+          "end": endMoment,
+          "timezone": startMoment.format('Z'),
+        },
+        "date_details": {
+          "year": startMoment.format('YYYY'),
+          "month": {
+            "number": startMoment.format('M'),
+            "name": startMoment.format('MMMM'),
+          },
+          "week_number": startMoment.format('W'),
+          "day_of_year": startMoment.format('DDD'),
+          "day_of_month": startMoment.format('D'),
+          "day_of_week": {
+            "number": startMoment.format('d'),
+            "name": startMoment.format('dddd'),
+          }
+        },
+        "session": {
+          "day": session.day,
+          "start_datetime": session.start_datetime,
+          "end_datetime": session.end_datetime,
+          "type": session.type,
+          "mood": session.mood,
+        }
+      }
+      let id = session.start_datetime;
+      bulk.push({index: {_index: c8.type(sessionIndex)._index, _id: id}});
+      bulk.push(data);
+      if (session.heart_rate) {
+        let d = moment(session.heart_rate.timestamp);
+        const duration = session.heart_rate.interval; // seconds
+        for (var shr of session.heart_rate.items) {
+          let id = d.format();
+          let data = {
+            "@timestamp": d.format(),
+            "ecs": {
+              "version": "1.6.0"
+            },
+            "date_details": {
+              "year": d.format('YYYY'),
+              "month": {
+                "number": d.format('M'),
+                "name": d.format('MMMM'),
+              },
+              "week_number": d.format('W'),
+              "day_of_year": d.format('DDD'),
+              "day_of_month": d.format('D'),
+              "day_of_week": {
+                "number": d.format('d'),
+                "name": d.format('dddd'),
+              }
+            },
+            "time_slice": time2slice(d),
+            "event": {
+              "created": d.format(),
+              "dataset": "oura.session",
+              "duration": duration * 1E9,
+              "ingested": new Date(),
+              "kind": "metric",
+              "module": "oura",
+              "original": JSON.stringify(shr),
+              "start": d,
+              "timezone": d.format('Z'),
+              "end": d.add(duration, 'seconds').format(),
+            },
+            "session": {
+              "hr": shr
+            }
+          }
+          bulk.push({index: {_index: c8.type(sessionHRIndex)._index, _id: id}});
+          bulk.push(data);
+        }
+      }
+      if (session.heart_rate_variability) {
+        let d = moment(session.heart_rate_variability.timestamp);
+        const duration = session.heart_rate_variability.interval; // seconds
+        for (var shrv of session.heart_rate_variability.items) {
+          let id = d.format();
+          let data = {
+            "@timestamp": d.format(),
+            "ecs": {
+              "version": "1.6.0"
+            },
+            "date_details": {
+              "year": d.format('YYYY'),
+              "month": {
+                "number": d.format('M'),
+                "name": d.format('MMMM'),
+              },
+              "week_number": d.format('W'),
+              "day_of_year": d.format('DDD'),
+              "day_of_month": d.format('D'),
+              "day_of_week": {
+                "number": d.format('d'),
+                "name": d.format('dddd'),
+              }
+            },
+            "time_slice": time2slice(d),
+            "event": {
+              "created": d.format(),
+              "dataset": "oura.session",
+              "duration": duration * 1E9,
+              "ingested": new Date(),
+              "kind": "metric",
+              "module": "oura",
+              "original": JSON.stringify(shrv),
+              "start": d,
+              "timezone": d.format('Z'),
+              "end": d.add(duration, 'seconds').format(),
+            },
+            "session": {
+              "rmssd": shrv
+            }
+          }
+          bulk.push({index: {_index: c8.type(sessionHRVIndex)._index, _id: id}});
+          bulk.push(data);
+        }
+      }
+      if (session.motion_count) {
+        let d = moment(session.motion_count.timestamp);
+        const duration = session.motion_count.interval; // seconds
+        for (var smc of session.motion_count.items) {
+          let id = d.format();
+          let data = {
+            "@timestamp": d.format(),
+            "ecs": {
+              "version": "1.6.0"
+            },
+            "date_details": {
+              "year": d.format('YYYY'),
+              "month": {
+                "number": d.format('M'),
+                "name": d.format('MMMM'),
+              },
+              "week_number": d.format('W'),
+              "day_of_year": d.format('DDD'),
+              "day_of_month": d.format('D'),
+              "day_of_week": {
+                "number": d.format('d'),
+                "name": d.format('dddd'),
+              }
+            },
+            "time_slice": time2slice(d),
+            "event": {
+              "created": d.format(),
+              "dataset": "oura.session",
+              "duration": duration * 1E9,
+              "ingested": new Date(),
+              "kind": "metric",
+              "module": "oura",
+              "original": JSON.stringify(smc),
+              "start": d,
+              "timezone": d.format('Z'),
+              "end": d.add(duration, 'seconds').format(),
+            },
+            "session": {
+              "motion_count": smc
+            }
+          }
+          bulk.push({index: {_index: c8.type(sessionMotionIndex)._index, _id: id}});
+          bulk.push(data);
+        }
+      }
+    }
+    let totalDocuments = 0;
+    let totalTime = 0;
+    if (bulk.length > 0) {
+      try {
+        // console.log(bulk.length);
+        // console.log(JSON.stringify(bulk, null, 1));
+        const response = await c8.bulk(bulk);
+        let result = c8.trimBulkResults(response);
+        totalDocuments += result.items.length;
+        totalTime += result.took;
+      }
+      catch (error) {
+        throw new Error('Failed to index sessions. ' + error.name + ': ' + error.message);
+      }
+    }
+    if (totalDocuments == 0) {
+      return 'No sessions to import';
+    }
+    else {
+      return 'Indexed ' + totalDocuments + ' session documents in ' + totalTime + ' ms.';
+    }
+  }
+  catch (error) {
+    throw new Error('Failed to get sessions. ' + error.name + ': ' + error.message);
+  }
+}
+
+async function getTags(c8, client, start, end) {
+  try {
+    let response = await client.tag(start, end);
+    let obj = response.data;
+    let bulk = [];
+    for (var i=0; i<obj.length; i++) {
+      let tag = obj[i];
+      let startMoment = moment(tag.timestamp);
+      let data = {
+        "@timestamp": tag.timestamp,
+        "ecs": {
+          "version": "1.6.0"
+        },
+        "event": {
+          "created": startMoment.format(),
+          "dataset": "oura.tag",
+          "ingested": new Date(),
+          "kind": "event",
+          "module": "oura",
+          "original": JSON.stringify(tag),
+          "start": startMoment,
+          "timezone": startMoment.format('Z'),
+        },
+        "time_slice": time2slice(startMoment),
+        "date_details": {
+          "year": startMoment.format('YYYY'),
+          "month": {
+            "number": startMoment.format('M'),
+            "name": startMoment.format('MMMM'),
+          },
+          "week_number": startMoment.format('W'),
+          "day_of_year": startMoment.format('DDD'),
+          "day_of_month": startMoment.format('D'),
+          "day_of_week": {
+            "number": startMoment.format('d'),
+            "name": startMoment.format('dddd'),
+          }
+        },
+        "tag": tag
+      }
+      let id = tag.timestamp;
+      bulk.push({index: {_index: c8.type(tagIndex)._index, _id: id}});
+      bulk.push(data);
+    }
+    let totalDocuments = 0;
+    let totalTime = 0;
+    if (bulk.length > 0) {
+      try {
+        // console.log(bulk.length);
+        // console.log(JSON.stringify(bulk, null, 1));
+        const response = await c8.bulk(bulk);
+        let result = c8.trimBulkResults(response);
+        totalDocuments += result.items.length;
+        totalTime += result.took;
+      }
+      catch (error) {
+        throw new Error('Failed to index tags. ' + error.name + ': ' + error.message);
+      }
+    }
+    if (totalDocuments == 0) {
+      return 'No tags to import';
+    }
+    else {
+      return 'Indexed ' + totalDocuments + ' tag documents in ' + totalTime + ' ms.';
+    }
+  }
+  catch (error) {
+    throw new Error('Failed to get tags. ' + error.name + ': ' + error.message);
+  }
+}
+
+async function getWorkouts(c8, client, start, end) {
+  try {
+    let response = await client.workout(start, end);
+    let obj = response.data;
+    let bulk = [];
+    for (var i=0; i<obj.length; i++) {
+      let workout = obj[i];
+      let startMoment = moment(workout.start_datetime);
+      let endMoment = moment(workout.end_datetime);
+      delete workout.start_datetime;
+      delete workout.end_datetime;
+      let data = {
+        "@timestamp": startMoment,
+        "ecs": {
+          "version": "1.6.0"
+        },
+        "event": {
+          "created": startMoment.format(),
+          "dataset": "oura.workout",
+          "duration": endMoment.diff(startMoment) * 1E6, // moment diff is milliseconds, want nanos
+          "ingested": new Date(),
+          "kind": "event",
+          "module": "oura",
+          "original": JSON.stringify(workout),
+          "start": startMoment,
+          "end": endMoment,
+          "timezone": startMoment.format('Z'),
+        },
+        "date_details": {
+          "year": startMoment.format('YYYY'),
+          "month": {
+            "number": startMoment.format('M'),
+            "name": startMoment.format('MMMM'),
+          },
+          "week_number": startMoment.format('W'),
+          "day_of_year": startMoment.format('DDD'),
+          "day_of_month": startMoment.format('D'),
+          "day_of_week": {
+            "number": startMoment.format('d'),
+            "name": startMoment.format('dddd'),
+          }
+        },
+        "workout": workout,
+      }
+      let id = startMoment.format();
+      bulk.push({index: {_index: c8.type(workoutIndex)._index, _id: id}});
+      bulk.push(data);
+    }
+    let totalDocuments = 0;
+    let totalTime = 0;
+    if (bulk.length > 0) {
+      try {
+        // console.log(bulk.length);
+        // console.log(JSON.stringify(bulk, null, 1));
+        const response = await c8.bulk(bulk);
+        let result = c8.trimBulkResults(response);
+        totalDocuments += result.items.length;
+        totalTime += result.took;
+      }
+      catch (error) {
+        throw new Error('Failed to index workouts. ' + error.name + ': ' + error.message);
+      }
+    }
+    if (totalDocuments == 0) {
+      return 'No workouts to import';
+    }
+    else {
+      return 'Indexed ' + totalDocuments + ' workout documents in ' + totalTime + ' ms.';
+    }
+  }
+  catch (error) {
+    throw new Error('Failed to get workouts. ' + error.name + ': ' + error.message);
+  }
+}
+
 
 function mins2ts(mins) {
   let hours = Math.abs(Math.round(mins/60));
