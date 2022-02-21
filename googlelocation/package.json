@@ -7,8 +7,8 @@
     "JSONStream": "latest",
     "correl8-cli": "latest",
     "end-of-stream": "latest",
-    "googleapis": "^85.0.0",
-    "moment": "^2.29.1",
+    "googleapis": "latest",
+    "moment": "latest",
     "prompt": "latest",
     "request": "latest",
     "tar": "latest"

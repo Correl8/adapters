@@ -6,9 +6,9 @@
   "dependencies": {
     "compressing": "latest",
     "correl8-cli": "latest",
-    "googleapis": "^85.0.0",
+    "googleapis": "latest",
     "htmlparser2": "latest",
-    "moment": "^2.29.1",
+    "moment": "latest",
     "prompt": "latest",
     "request": "latest",
     "request-stream": "latest",
@@ -16,7 +16,6 @@
     "stream-json": "latest",
     "tar": "latest"
   },
-  "devDependencies": {},
   "scripts": {
     "start": "node node_modules/correl8-cli/app.js -a ../../index.js"
   },

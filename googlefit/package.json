@@ -6,9 +6,9 @@
   "dependencies": {
     "correl8-cli": "latest",
     "google-fit-activity-types": "latest",
-    "googleapis": "^87.0.0",
+    "googleapis": "latest",
     "moment": "latest",
-    "prompt": "^1.2.0"
+    "prompt": "latest"
   },
   "scripts": {
     "start": "node node_modules/correl8-cli/app.js -a ../../index.js"
