@@ -5,7 +5,7 @@
   "main": "index.js",
   "dependencies": {
     "correl8-cli": "latest",
-    "dayjs": "^1.10.2",
+    "dayjs": "latest",
     "nordpool": "latest"
   },
   "devDependencies": {},

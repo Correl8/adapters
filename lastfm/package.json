@@ -4,8 +4,8 @@
   "description": "Import data from Last.fm into Correl8.me",
   "main": "index.js",
   "dependencies": {
-    "correl8-cli": "^0.1.0",
-    "lastfmapi": "^0.1.1"
+    "correl8-cli": "latest",
+    "lastfmapi": "latest"
   },
   "devDependencies": {},
   "scripts": {
