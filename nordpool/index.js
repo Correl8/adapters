@@ -1,9 +1,9 @@
-const nordpool = require("nordpool")
+// const nordpool = require("nordpool")
+// import nordpool from 'nordpool'
+// nordpool module imported later using dynamic import()
 const dayjs = require('dayjs')
 const utc = require('dayjs/plugin/utc')
 const timezone = require('dayjs/plugin/timezone')
-
-const prices = new nordpool.Prices()
 
 dayjs.extend(utc)
 dayjs.extend(timezone)
@@ -117,6 +117,8 @@ adapter.importData = async (c8, conf, opts) => {
     if (firstDate) {
       params.from = firstDate
     }
+    const { nordpool } = await import('nordpool')
+    const prices = new nordpool.Prices()
     const data = await prices.hourly(params)
     if (data && data.length) {
       var bulk = []
