@@ -1,5 +1,4 @@
-const nodeFetch = require('node-fetch')
-const fetch = require('fetch-cookie/node-fetch')(nodeFetch)
+const https = require('node:https');
 
 // if no start date is given as an argument,
 // fetch data from last DEFAULT_DAYS days
@@ -67,7 +66,7 @@ adapter.importData = async (c8, conf, opts) => {
       const lastDate = opts.lastDate
       url += '&to=' + lastDate.getDate() + '.' + (lastDate.getMonth() + 1) + '.' + lastDate.getFullYear()
     }
-    const data = await fetch(url).then(res => res.json())
+    let data = JSON.parse(await httpsGet(url))
     if (data && data.length) {
       const bulk = []
       for (dayData of data) {
@@ -75,28 +74,28 @@ adapter.importData = async (c8, conf, opts) => {
         for (dd of dayData) {
           var id = dd.date + '-' + dd.t
           let data = {
-              "@timestamp": dd.date,
-              "event": {
-                "created": new Date(),
-                "module": "expense",
-                "original": JSON.stringify(dd),
-                "start": dd.date,
+            "@timestamp": dd.date,
+            "event": {
+              "created": new Date(),
+              "module": "expense",
+              "original": JSON.stringify(dd),
+              "start": dd.date,
+            },
+            "expense": {
+              "category": {
+                "id": dd.c,
+                "name": dd.category,
               },
-              "expense": {
-                "category": {
-                  "id": dd.c,
-                  "name": dd.category,
-                },
-                "type": {
-                  "id": dd.t,
-                  "name": dd.type,
-                },
-                "cost": dd.cost
-              }
+              "type": {
+                "id": dd.t,
+                "name": dd.type,
+              },
+              "cost": dd.cost
             }
-            bulk.push({index: {_index: c8._index, _id: id}})
-            bulk.push(data)
-            dayCost += dd.cost
+          }
+          bulk.push({index: {_index: c8._index, _id: id}})
+          bulk.push(data)
+          dayCost += dd.cost
         }
         console.log(dayData[0].date + ': ' + dayCost)
       }
@@ -126,6 +125,27 @@ adapter.importData = async (c8, conf, opts) => {
   catch(e) {
     throw new Error(e)
   }
+}
+
+async function httpsGet(url, headers=[]) {
+  return new Promise(async (resolve, reject) => {
+    https.get(url, headers, res => {
+      if (res.statusCode == 303) {
+        const cookies = res.headers['set-cookie']
+        const cookie = cookies[cookies.length-1].slice(0, cookies[cookies.length-1].indexOf(';'))
+        const data = httpsGet(res.headers.location, {headers: {'Cookie': cookie}})
+        resolve(data) // returning a promise, will be handled by await
+      }
+      else {
+        const body = []
+        res.on('data', chunk => body.push(chunk));
+        res.on('end', () => {
+          const data = Buffer.concat(body).toString();
+          resolve(data);
+        });
+      }
+    });
+  });
 }
 
 module.exports = adapter;
